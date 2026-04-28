@@ -3120,101 +3120,178 @@ function StudentApp({
       )}
 
       {screen === "lesson" && (
-        <Card title={`Question ${questionIndex + 1}/${totalQuestions}`}>
-          <div style={styles.lessonMetaRow}>
-            <span style={styles.skillTag}>{skill.toUpperCase()}</span>
-            <span style={styles.skillTag}>{lessonQuestion.outcome}</span>
-            <span style={styles.skillTag}>{lessonQuestion.indicator || "No indicator"}</span>
-            <span style={styles.skillTag}>{(lessonQuestion.difficulty || "normal").toUpperCase()}</span>
-          </div>
+  <Card title={`Question ${questionIndex + 1}/${totalQuestions}`}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+      <span style={styles.skillTag}>{lessonQuestion.outcome}</span>
+      <span style={styles.skillTag}>{lessonQuestion.indicator || "No indicator"}</span>
+      <span style={styles.skillTag}>{(lessonQuestion.difficulty || "normal").toUpperCase()}</span>
+    </div>
 
-          {currentAssignment && currentAssignment.status !== "completed" && <p style={styles.interventionNotice}>Teacher assigned work: {currentAssignment.type} {currentAssignment.target}</p>}
-          {assessmentMode && <p style={styles.interventionNotice}>Outcome assessment in progress. Try this independently first.</p>}
-          {practiceMode && <p style={styles.interventionNotice}>Targeted practice assigned: {lessonQuestion.skill}</p>}
-          {(simplifiedMode || currentAdaptations?.simplifiedNumbers) && <p style={styles.interventionNotice}>Simplified support is on. Use the visual model first, then choose your answer.</p>}
-          {currentAdaptations?.workedExamples && (
-            <div style={styles.supportBox}>
-              <strong>Worked example:</strong> {adaptationSupport?.workedExample}
-            </div>
-          )}
-          {currentAdaptations?.formulaSheet && (
-            <div style={styles.supportBox}>
-              <strong>Helpful reminder:</strong> {adaptationSupport?.formulaReminder}
-            </div>
-          )}
-          {currentAdaptations?.simplifiedNumbers && (
-            <div style={styles.supportBox}>
-              <strong>Simplified question mode:</strong> {adaptationSupport?.simplifiedNote}
-            </div>
-          )}
+    {practiceMode && (
+      <p style={styles.interventionNotice}>
+        Targeted practice: use the model first, then choose your answer.
+      </p>
+    )}
 
-          <p style={styles.bigText}>{lessonQuestion.prompt}</p>
+    {assessmentMode && (
+      <p style={styles.interventionNotice}>
+        Assessment mode: try this independently first.
+      </p>
+    )}
 
-          {lessonQuestion.prompt.toLowerCase().includes("fraction") && <FractionVisual selected={selected} setSelected={setSelected} />}
-          {lessonQuestion.prompt.toLowerCase().includes("decimal") && <DecimalVisual />}
-          {lessonQuestion.visualType && <CurriculumVisual question={lessonQuestion} />}
+    {currentAdaptations?.examples && (
+      <div style={styles.supportBox}>
+        <strong>Example:</strong> {adaptationSupport?.workedExample}
+      </div>
+    )}
 
-          {lessonQuestion.thinkingSteps && (
-            <div style={styles.thinkingCard}>
-              <strong>Math thinking</strong>
-              {lessonQuestion.thinkingSteps.map((step, index) => (
-                <div key={step} style={styles.thinkingStep}>
-                  <span style={styles.thinkingNumber}>{index + 1}</span>
-                  <span>{step}</span>
-                </div>
-              ))}
-            </div>
-          )}
+    {currentAdaptations?.formulaSheet && (
+      <div style={styles.supportBox}>
+        <strong>Helpful reminder:</strong> {adaptationSupport?.formulaReminder}
+      </div>
+    )}
 
-          {lessonQuestion.type === "multi-step" && (
-            <div style={styles.multiStepBox}>
-              {lessonQuestion.steps.map((step, index) => (
-                <div key={step.prompt} style={styles.stepCard}>
-                  <strong>{step.prompt}</strong>
-                  <div style={styles.answers}>
-                    {step.answers.map((answer) => (
-                      <button
-                        key={answer}
-                        type="button"
-                        onClick={() => setMultiStepAnswers((prev) => ({ ...prev, [index]: answer }))}
-                        style={multiStepAnswers[index] === answer ? styles.selectedAnswer : styles.answer}
-                      >
-                        {answer}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+    {currentAdaptations?.simplifiedNumbers && (
+      <div style={styles.supportBox}>
+        <strong>Simplified support:</strong> {adaptationSupport?.simplifiedNote}
+      </div>
+    )}
 
-          {lessonQuestion.type !== "multi-step" && (
-            <div style={styles.answers}>
-              {lessonQuestion.answers.map((answer) => (
-                <button key={answer} type="button" onClick={() => setSelected(answer)} style={selected === answer ? styles.selectedAnswer : styles.answer}>{answer}</button>
-              ))}
-            </div>
-          )}
+    <div style={{ ...styles.analyticsCard, marginTop: 12 }}>
+      <p style={styles.eyebrowDark}>Question</p>
+      <h2 style={{ marginTop: 4 }}>{lessonQuestion.prompt}</h2>
 
-          {feedback && <p style={styles.feedback}>{feedback}</p>}
-
-          <div style={styles.row}>
-            <button
-              type="button"
-              onClick={checkAnswer}
-              disabled={lessonQuestion.type === "multi-step" ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length : !selected}
-              style={{
-                ...styles.primary,
-                opacity: lessonQuestion.type === "multi-step" ? (Object.keys(multiStepAnswers).length < lessonQuestion.steps.length ? 0.5 : 1) : selected ? 1 : 0.5,
-                cursor: lessonQuestion.type === "multi-step" ? (Object.keys(multiStepAnswers).length < lessonQuestion.steps.length ? "not-allowed" : "pointer") : selected ? "pointer" : "not-allowed",
-              }}
-            >
-              {feedback && hintLevel === 1 ? "More Help" : feedback && hintLevel === 2 ? "Show Answer" : "Check Answer"}
-            </button>
-            {feedback && hintLevel === 0 && <button type="button" onClick={nextQuestion} style={styles.secondary}>Continue</button>}
-          </div>
-        </Card>
+      {lessonQuestion.visualType && (
+        <div style={{ marginTop: 16 }}>
+          <CurriculumVisual question={lessonQuestion} />
+        </div>
       )}
+
+      {lessonQuestion.thinkingSteps && (
+        <div style={styles.thinkingCard}>
+          <strong>Think it through</strong>
+          {lessonQuestion.thinkingSteps.map((step, index) => (
+            <div key={step} style={styles.thinkingStep}>
+              <span style={styles.thinkingNumber}>{index + 1}</span>
+              <span>{step}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {lessonQuestion.type === "multi-step" ? (
+      <div style={styles.multiStepBox}>
+        {lessonQuestion.steps.map((step, index) => (
+          <div key={step.prompt} style={styles.stepCard}>
+            <strong>{step.prompt}</strong>
+
+            <div style={styles.answers}>
+              {step.answers.map((answer) => (
+                <button
+                  key={answer}
+                  type="button"
+                  onClick={() =>
+                    setMultiStepAnswers((prev) => ({
+                      ...prev,
+                      [index]: answer,
+                    }))
+                  }
+                  style={
+                    multiStepAnswers[index] === answer
+                      ? styles.selectedAnswer
+                      : styles.answer
+                  }
+                >
+                  {answer}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div style={styles.answers}>
+        {lessonQuestion.answers.map((answer) => (
+          <button
+            key={answer}
+            type="button"
+            onClick={() => setSelected(answer)}
+            style={selected === answer ? styles.selectedAnswer : styles.answer}
+          >
+            {answer}
+          </button>
+        ))}
+      </div>
+    )}
+
+    {feedback && (
+  <div
+    style={{
+      ...styles.feedback,
+      borderLeft: feedback.includes("Correct") ? "6px solid #16a34a" : "6px solid #f97316",
+      background: feedback.includes("Correct") ? "#dcfce7" : "#ffedd5",
+      color: "#0f172a",
+    }}
+  >
+    <strong>
+      {feedback.includes("Correct") ? "Nice work!" : "Let’s learn from that."}
+    </strong>
+
+    <p style={{ margin: "6px 0 0" }}>{feedback}</p>
+
+    {!feedback.includes("Correct") && adaptationSupport?.workedExample && (
+      <p style={{ margin: "8px 0 0" }}>
+        <strong>Try this idea:</strong> {adaptationSupport.workedExample}
+      </p>
+    )}
+  </div>
+)}
+
+    <div style={styles.row}>
+      <button
+        type="button"
+        onClick={checkAnswer}
+        disabled={
+          lessonQuestion.type === "multi-step"
+            ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
+            : !selected
+        }
+        style={{
+          ...styles.primary,
+          opacity:
+            lessonQuestion.type === "multi-step"
+              ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
+                ? 0.5
+                : 1
+              : selected
+              ? 1
+              : 0.5,
+          cursor:
+            lessonQuestion.type === "multi-step"
+              ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
+                ? "not-allowed"
+                : "pointer"
+              : selected
+              ? "pointer"
+              : "not-allowed",
+        }}
+      >
+        Check Answer
+      </button>
+
+      {feedback && hintLevel === 0 && (
+        <button type="button" onClick={nextQuestion} style={styles.secondary}>
+          Continue
+        </button>
+      )}
+
+      <button type="button" onClick={() => setScreen("today")} style={styles.secondary}>
+        Back to Today
+      </button>
+    </div>
+  </Card>
+)}
 
       {screen === "mini" && (
         <Card title="Mini Lesson Assigned">
