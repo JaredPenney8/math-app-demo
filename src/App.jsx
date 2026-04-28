@@ -2358,28 +2358,32 @@ export default function App() {
   }
 
   function nextQuestion() {
-    if (questionIndex < questions.length - 1) {
-      setQuestionIndex((index) => index + 1);
-    } else if (assessmentMode) {
-      finishAssessmentSession();
+  if (questionIndex < questions.length - 1) {
+    setQuestionIndex((index) => index + 1);
+  } else if (assessmentMode) {
+    finishAssessmentSession();
+    return;
+  } else if (practiceMode) {
+    finishPracticeSession();
+    return;
+  } else {
+    const mastery = getCurrentOutcomeMastery();
+
+    if (mastery.mastered) {
+      unlockNextSkill();
       return;
-    } else if (practiceMode) {
-      finishPracticeSession();
-      return;
-    } else {
-      const mastery = getCurrentOutcomeMastery();
-      if (mastery.mastered) {
-        unlockNextSkill();
-        return;
-      }
-      setQuestionIndex(0);
     }
 
-    setSelected("");
-    setMultiStepAnswers({});
-    setFeedback("");
-    setHintLevel(0);
+    setQuestionIndex(0);
+    setStudentScreen("complete");
+    return;
   }
+
+  setSelected("");
+  setMultiStepAnswers({});
+  setFeedback("");
+  setHintLevel(0);
+}
 
   function unlockNextSkill() {
     if (!completedSkills.includes(skill)) setCompletedSkills((old) => [...old, skill]);
@@ -3368,7 +3372,57 @@ const indicatorProgressPercent = Math.min(
     </div>
   </Card>
 )}
+{screen === "complete" && (
+  <Card title="Practice Complete">
+    <div style={{ textAlign: "center", padding: 20 }}>
+      <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
 
+      <h2 style={{ margin: "0 0 8px" }}>Nice work today!</h2>
+
+      <p style={styles.sectionIntro}>
+        Your progress has been saved. Your teacher can now see your latest practice evidence.
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12,
+          marginTop: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div style={styles.currentTaskCard}>
+          <p style={styles.eyebrowDark}>Streak</p>
+          <strong>{correctStreak}</strong>
+          <div style={styles.cellSubtext}>correct in a row</div>
+        </div>
+
+        <div style={styles.currentTaskCard}>
+          <p style={styles.eyebrowDark}>Mode</p>
+          <strong>{assessmentMode ? "Assessment" : practiceMode ? "Practice" : "Lesson"}</strong>
+          <div style={styles.cellSubtext}>session complete</div>
+        </div>
+
+        <div style={styles.currentTaskCard}>
+          <p style={styles.eyebrowDark}>Saved</p>
+          <strong>Yes</strong>
+          <div style={styles.cellSubtext}>teacher dashboard updated</div>
+        </div>
+      </div>
+
+      <div style={styles.row}>
+        <button type="button" onClick={() => setScreen("today")} style={styles.primary}>
+          Back to Today
+        </button>
+
+        <button type="button" onClick={() => setScreen("dashboard")} style={styles.secondary}>
+          Student Dashboard
+        </button>
+      </div>
+    </div>
+  </Card>
+)}
       {screen === "mini" && (
         <Card title="Mini Lesson Assigned">
           {intervention && <p style={styles.interventionNotice}>{intervention.message}</p>}
