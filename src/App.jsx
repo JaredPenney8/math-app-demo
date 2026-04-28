@@ -17,6 +17,144 @@ import {
   makeDefaultAdaptationRow,
 } from "./data/curriculumData";
 
+function TapBoxFractionQuestion({ total = 10, target = null, selectedCount = 0, onChange }) {
+  const columns = total <= 5 ? total : Math.min(total, 10);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #dbeafe",
+          borderRadius: 16,
+          padding: 14,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ fontWeight: 900, marginBottom: 6 }}>
+          Target: {target ?? "?"}/{total}
+        </div>
+
+        <div style={{ color: "#64748b", fontSize: 14 }}>
+          Tap the boxes to shade the fraction.
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns}, minmax(38px, 52px))`,
+          gap: 8,
+          marginBottom: 10,
+          maxWidth: "100%",
+        }}
+      >
+        {Array.from({ length: total }).map((_, index) => {
+          const boxNumber = index + 1;
+          const isFilled = boxNumber <= selectedCount;
+
+          return (
+            <button
+              key={boxNumber}
+              type="button"
+              aria-label={`Shade ${boxNumber} out of ${total}`}
+              onClick={() => onChange(boxNumber)}
+              style={{
+                aspectRatio: "1 / 1",
+                borderRadius: 12,
+                border: "2px solid #2563eb",
+                background: isFilled ? "#2563eb" : "#ffffff",
+                color: isFilled ? "#ffffff" : "#2563eb",
+                fontWeight: 900,
+                cursor: "pointer",
+                boxShadow: isFilled ? "0 8px 18px rgba(37, 99, 235, 0.25)" : "none",
+              }}
+            >
+              {isFilled ? "✓" : ""}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ fontWeight: 900 }}>
+        You shaded: {selectedCount}/{total}
+      </div>
+    </div>
+  );
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffleQuestions(items) {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
+function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", count = 5) {
+  const denominators = [2, 3, 4, 5, 6, 8, 10];
+  const used = new Set();
+  const questions = [];
+
+  while (questions.length < count) {
+    const total = denominators[randomInt(0, denominators.length - 1)];
+    const target = randomInt(1, total - 1);
+    const key = `${target}/${total}`;
+
+    if (used.has(key)) continue;
+    used.add(key);
+
+    questions.push({
+      id: `generated-tapbox-${outcome}-${indicator}-${key}-${Date.now()}-${questions.length}`,
+      prompt: `Tap the boxes to shade ${key}.`,
+      difficulty: total <= 4 ? "easy" : total <= 6 ? "normal" : "challenge",
+      answers: [key],
+      correct: key,
+      tapBoxModel: {
+        total,
+        target,
+      },
+      outcome,
+      indicator,
+      skill: "Fraction visual model",
+      visualType: "tapBoxFraction",
+      modelLabel: `${target} out of ${total} shaded boxes`,
+      thinkingSteps: [
+        `The denominator ${total} means there are ${total} equal parts.`,
+        `The numerator ${target} means you need to shade ${target} parts.`,
+        "Tap the boxes until the shaded amount matches the target fraction.",
+      ],
+      curriculumText: "Represent and partition numbers/fractions using visual models.",
+      mistakeIfWrong: `Needs support representing ${key} with shaded parts.`,
+      hint: `The bottom number tells how many total boxes there are: ${total}.`,
+      hint2: `The top number tells how many boxes to shade: ${target}.`,
+      generated: true,
+    });
+  }
+
+  return questions;
+}
+
+function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5) {
+  if (outcome === "NO4") {
+    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count);
+  }
+
+  const outcomeQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
+  const fallback = QUESTION_BANK[fallbackSkill] || activeAllQuestions.slice(0, count);
+
+  return shuffleQuestions(outcomeQuestions.length ? outcomeQuestions : fallback).slice(0, count);
+}
+
+function buildSkillQuestionSet(skill, activeAllQuestions, count = 5) {
+  if (skill === "fractions") {
+    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count);
+  }
+
+  const base = QUESTION_BANK[skill] || activeAllQuestions.slice(0, count);
+  return shuffleQuestions(base).slice(0, count);
+}
+
 function getVisualTypeForIndicator(indicatorId, text) {
   const lower = `${indicatorId} ${text}`.toLowerCase();
   if (lower.includes("coin") || lower.includes("money")) return "coins";
@@ -635,10 +773,14 @@ function getQuestionEditCounts(questionEdits) {
 const QUESTION_BANK = {
   fractions: [
     {
-      prompt: "Which fraction is shaded?",
+      prompt: "Tap the boxes to shade 3/4.",
       difficulty: "easy",
       answers: ["1/4", "2/4", "3/4"],
       correct: "3/4",
+      tapBoxModel: {
+  total: 4,
+  target: 3,
+},
       outcome: "NO4",
       indicator: "NO4.01",
       skill: "Fraction visual model",
@@ -1921,12 +2063,16 @@ export default function App() {
     return [...normal, ...easy.slice(0, 1), ...challenge.slice(0, 1)];
   }, [currentStudent, outcomeStats, activeAllQuestions]);
 
+  const generatedSkillQuestions = useMemo(() => {
+    return buildSkillQuestionSet(skill, activeAllQuestions, 5);
+  }, [skill, activeAllQuestions]);
+
   const questions =
   assessmentMode && assessmentQueue.length > 0
     ? assessmentQueue
     : practiceMode && practiceQueue.length > 0
     ? practiceQueue
-    : weakOutcomeQuestions || QUESTION_BANK[skill] || activeAllQuestions.filter((q) => q.outcome === "N01").slice(0, 6) || [];
+    : weakOutcomeQuestions || generatedSkillQuestions || QUESTION_BANK[skill] || activeAllQuestions.filter((q) => q.outcome === "N01").slice(0, 6) || [];
   const question = questions[questionIndex] ?? questions[0] ?? null;
   const currentAssignment = teacherAssignments[currentStudent];
   const currentNextStep = getStudentNextStep(currentStudent, indicatorStats, assessmentStats, teacherAssignments);
@@ -2127,11 +2273,11 @@ export default function App() {
           ...old,
         ]);
 
-        const targetedQuestions = activeAllQuestions.filter((q) => q.outcome === question.outcome);
+        const targetedQuestions = buildPracticeQuestionSet(question.outcome, activeAllQuestions, skill, 5);
         const practiceKey = `${currentStudent}-${question.outcome}`;
         setPracticeStats((old) => ({ ...old, [practiceKey]: { before: mistakeCounts[practiceKey] || 0, after: null, improvement: null } }));
         setPracticeSession({ key: practiceKey, skill: question.outcome, attempts: 0, correct: 0, wrong: 0 });
-        setPracticeQueue(targetedQuestions.length ? targetedQuestions : QUESTION_BANK[skill] || activeAllQuestions.slice(0, 6));
+        setPracticeQueue(targetedQuestions);
         setPracticeMode(true);
         setQuestionIndex(0);
         setIntervention({ type: "targeted_practice_auto", message: "I noticed this outcome is still tricky. I’m starting targeted practice now." });
@@ -2617,10 +2763,10 @@ export default function App() {
 
   function startOutcomePractice(outcome) {
     const nextSkill = OUTCOME_TO_SKILL[outcome] || skill;
-    const outcomeQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
+    const outcomeQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, nextSkill, 5);
 
     setSkill(nextSkill);
-    setPracticeQueue(outcomeQuestions.length ? outcomeQuestions : QUESTION_BANK[nextSkill] || activeAllQuestions.slice(0, 6));
+    setPracticeQueue(outcomeQuestions);
     setPracticeMode(true);
     setAssessmentMode(false);
     setAssessmentQueue([]);
@@ -2646,7 +2792,7 @@ export default function App() {
       return;
     }
 
-    const assignedQuestions = activeAllQuestions.filter((q) => q.outcome === assignment.target);
+    const assignedQuestions = buildPracticeQuestionSet(assignment.target, activeAllQuestions, OUTCOME_TO_SKILL[assignment.target] || skill, 5);
     if (assignedQuestions.length === 0) {
       startOutcomePractice(assignment.target);
       return;
@@ -2684,7 +2830,7 @@ export default function App() {
 
   function assignOutcomePractice(student, outcome) {
     setCurrentStudent(student);
-    const assignedQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
+    const assignedQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, OUTCOME_TO_SKILL[outcome] || skill, 5);
     if (assignedQuestions.length === 0) return;
 
     setTeacherAssignments((prev) => ({
@@ -3240,12 +3386,29 @@ const indicatorProgressPercent = Math.min(
     <div style={{ ...styles.analyticsCard, marginTop: 12 }}>
       <p style={styles.eyebrowDark}>Question</p>
       <h2 style={{ marginTop: 4 }}>{lessonQuestion.prompt}</h2>
+      {lessonQuestion.tapBoxModel && (
+  <TapBoxFractionQuestion
+    total={lessonQuestion.tapBoxModel.total}
+    target={lessonQuestion.tapBoxModel.target}
+    selectedCount={
+      selected && selected.includes("/")
+        ? Number(selected.split("/")[0])
+        : 0
+    }
+    onChange={(count) => {
+      setSelected(`${count}/${lessonQuestion.tapBoxModel.total}`);
+      setTimeout(() => {
+        checkAnswer();
+      }, 100);
+    }}
+  />
+)}
 
       {lessonQuestion.visualType && (
-        <div style={{ marginTop: 16 }}>
-          <CurriculumVisual question={lessonQuestion} />
-        </div>
-      )}
+  <div style={{ marginTop: 16 }}>
+    <CurriculumVisual question={lessonQuestion} />
+  </div>
+)}
 
       {lessonQuestion.thinkingSteps && (
         <div style={styles.thinkingCard}>
@@ -3260,7 +3423,7 @@ const indicatorProgressPercent = Math.min(
       )}
     </div>
 
-    {lessonQuestion.type === "multi-step" ? (
+    {lessonQuestion.tapBoxModel ? null : lessonQuestion.type === "multi-step" ? (
       <div style={styles.multiStepBox}>
         {lessonQuestion.steps.map((step, index) => (
           <div key={step.prompt} style={styles.stepCard}>
@@ -3271,12 +3434,20 @@ const indicatorProgressPercent = Math.min(
                 <button
                   key={answer}
                   type="button"
-                  onClick={() =>
-                    setMultiStepAnswers((prev) => ({
-                      ...prev,
-                      [index]: answer,
-                    }))
-                  }
+                  onClick={() => {
+  const updated = {
+    ...multiStepAnswers,
+    [index]: answer,
+  };
+
+  setMultiStepAnswers(updated);
+
+  if (Object.keys(updated).length === lessonQuestion.steps.length) {
+    setTimeout(() => {
+      checkAnswer(updated);
+    }, 100);
+  }
+}}
                   style={
                     multiStepAnswers[index] === answer
                       ? styles.selectedAnswer
@@ -3296,7 +3467,12 @@ const indicatorProgressPercent = Math.min(
           <button
             key={answer}
             type="button"
-            onClick={() => setSelected(answer)}
+            onClick={() => {
+  setSelected(answer);
+  setTimeout(() => {
+    checkAnswer(answer);
+  }, 100);
+}}
             style={selected === answer ? styles.selectedAnswer : styles.answer}
           >
             {answer}
@@ -3357,7 +3533,13 @@ const indicatorProgressPercent = Math.min(
               : "not-allowed",
         }}
       >
-        Check Answer
+        <button
+  type="button"
+  disabled
+  style={{ ...styles.primary, opacity: 0.3 }}
+>
+  Auto Check
+</button>
       </button>
 
       {feedback && hintLevel === 0 && (
