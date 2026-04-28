@@ -2976,6 +2976,23 @@ function StudentApp({
   const lessonQuestion = applyAdaptationsToQuestion(question, currentAdaptations) || question;
   const adaptationSupport = lessonQuestion.adaptationSupport || getAdaptationSupport(question, currentAdaptations);
   const outcomeDisplay = getOutcomeDisplay(indicatorStats, assessmentStats, currentStudent, question.outcome);
+  const currentIndicatorKey = `${currentStudent}-${question.indicator || `${question.outcome}.01`}`;
+const currentIndicatorProgress = indicatorStats[currentIndicatorKey] || {
+  attempts: 0,
+  correct: 0,
+  accuracy: 0,
+  status: "Not Started",
+};
+
+const indicatorMasteryTarget = 3;
+const indicatorAttempts = currentIndicatorProgress.attempts || 0;
+const indicatorCorrect = currentIndicatorProgress.correct || 0;
+const indicatorAccuracy = currentIndicatorProgress.accuracy || 0;
+const indicatorStatus = currentIndicatorProgress.status || "Not Started";
+const indicatorProgressPercent = Math.min(
+  100,
+  Math.round((indicatorAttempts / indicatorMasteryTarget) * 100)
+);
   const outcomePathDisplays = OUTCOMES.map((outcome) => getOutcomeDisplay(indicatorStats, assessmentStats, currentStudent, outcome));
 
   const navItems = [
@@ -3126,6 +3143,65 @@ function StudentApp({
       <span style={styles.skillTag}>{lessonQuestion.indicator || "No indicator"}</span>
       <span style={styles.skillTag}>{(lessonQuestion.difficulty || "normal").toUpperCase()}</span>
     </div>
+
+    <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: 10,
+    marginBottom: 16,
+  }}
+>
+  <div style={styles.currentTaskCard}>
+    <div>
+      <p style={styles.eyebrowDark}>Indicator Progress</p>
+      <strong>{indicatorAttempts}/{indicatorMasteryTarget} attempts</strong>
+      <div style={styles.cellSubtext}>
+        {indicatorCorrect} correct · {indicatorAccuracy}% accuracy
+      </div>
+    </div>
+  </div>
+
+  <div style={styles.currentTaskCard}>
+    <div>
+      <p style={styles.eyebrowDark}>Status</p>
+      <strong>{indicatorStatus}</strong>
+      <div style={styles.cellSubtext}>
+        Goal: 3 attempts with 80%+
+      </div>
+    </div>
+  </div>
+
+  <div style={styles.currentTaskCard}>
+    <div>
+      <p style={styles.eyebrowDark}>Streak</p>
+      <strong>{correctStreak}</strong>
+      <div style={styles.cellSubtext}>
+        Correct answers in a row
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  style={{
+    height: 12,
+    background: "#e5e7eb",
+    borderRadius: 999,
+    overflow: "hidden",
+    marginBottom: 18,
+  }}
+>
+  <div
+    style={{
+      width: `${indicatorProgressPercent}%`,
+      height: "100%",
+      background: indicatorStatus === "Mastered" ? "#16a34a" : "#2563eb",
+      borderRadius: 999,
+      transition: "width 0.25s ease",
+    }}
+  />
+</div>
 
     {practiceMode && (
       <p style={styles.interventionNotice}>
