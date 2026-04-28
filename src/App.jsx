@@ -147,15 +147,20 @@ function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", c
   return questions;
 }
 
-function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5, adaptiveLevel = "normal") {
+function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5, adaptiveLevel = "normal", targetIndicator = null) {
+  const safeIndicator = targetIndicator || `${outcome}.01`;
+
   if (outcome === "NO4") {
-    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count, adaptiveLevel);
+    return buildFractionTapBoxPracticeSet("NO4", safeIndicator, count, adaptiveLevel);
   }
 
   const outcomeQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
+  const targetedQuestions = targetIndicator
+    ? outcomeQuestions.filter((q) => q.indicator === targetIndicator)
+    : outcomeQuestions;
   const fallback = QUESTION_BANK[fallbackSkill] || activeAllQuestions.slice(0, count);
 
-  return shuffleQuestions(outcomeQuestions.length ? outcomeQuestions : fallback).slice(0, count);
+  return shuffleQuestions(targetedQuestions.length ? targetedQuestions : outcomeQuestions.length ? outcomeQuestions : fallback).slice(0, count);
 }
 
 function buildSkillQuestionSet(skill, activeAllQuestions, count = 5, adaptiveLevel = "normal") {
@@ -1038,6 +1043,31 @@ function getIndicatorSummaryForStudent(indicatorStats, student, outcome) {
   };
 }
 
+function getWeakestIndicatorForOutcome(indicatorStats, student, outcome, fallbackIndicator = null) {
+  const indicators = INDICATOR_CATALOG[outcome] || [];
+  if (indicators.length === 0) return fallbackIndicator || `${outcome}.01`;
+
+  const rows = indicators.map((indicator) => {
+    const data = indicatorStats?.[`${student}-${indicator}`] || {};
+    const attempts = data.attempts ?? 0;
+    const correct = data.correct ?? 0;
+    const accuracy = attempts > 0 ? Math.round((correct / attempts) * 100) : 0;
+    const mastered = attempts >= 3 && accuracy >= 80;
+
+    return { indicator, attempts, correct, accuracy, mastered };
+  });
+
+  const unfinished = rows.filter((row) => !row.mastered);
+  const candidates = unfinished.length ? unfinished : rows;
+
+  return [...candidates].sort((a, b) => {
+    if (a.attempts === 0 && b.attempts > 0) return -1;
+    if (b.attempts === 0 && a.attempts > 0) return 1;
+    if (a.accuracy !== b.accuracy) return a.accuracy - b.accuracy;
+    return a.indicator.localeCompare(b.indicator);
+  })[0]?.indicator || fallbackIndicator || `${outcome}.01`;
+}
+
 function getAssessmentSummary(assessmentStats, student, outcome) {
   const data = assessmentStats[`${student}-${outcome}`];
   if (!data) {
@@ -1182,7 +1212,13 @@ function getStudentTodayPlan(student, indicatorStats, assessmentStats, teacherAs
   }
 
   const weakest = [...notMastered].sort((a, b) => a.masteredCount / a.requiredCount - b.masteredCount / b.requiredCount)[0];
-  const nextIndicator = weakest.items.find((item) => !item.mastered)?.indicator || weakest.items[0]?.indicator || weakest.outcome;
+  const nextIndicator = [...weakest.items]
+    .filter((item) => !item.mastered)
+    .sort((a, b) => {
+      if (a.attempts === 0 && b.attempts > 0) return -1;
+      if (b.attempts === 0 && a.attempts > 0) return 1;
+      return (a.accuracy ?? 0) - (b.accuracy ?? 0);
+    })[0]?.indicator || weakest.items[0]?.indicator || weakest.outcome;
 
   return {
     title: `Build indicators for ${weakest.outcome}`,
@@ -1256,27 +1292,73 @@ function getInstructionalGroups(analytics) {
   };
 
   analytics.studentRows.forEach((row) => {
-    if (row.nextStep.includes("assessment") || row.readyCount > 0) {
-      groups.assessmentReady.push(row);
+    const reassessmentOutcome = row.outcomes.find(
+      (outcome) => outcome.assessment.status === "Needs Reassessment"
+    );
+
+    if (reassessmentOutcome) {
+      groups.reteach.push({
+        ...row,
+        groupReason: `${reassessmentOutcome.outcome} assessment needs a rebuild`,
+        groupFocus: reassessmentOutcome.outcome,
+        groupMove: "Reteach briefly, then assign targeted practice before reassessment.",
+      });
       return;
     }
 
-    if (row.supportCount > 0 || row.nextStep.includes("Rebuild")) {
-      groups.reteach.push(row);
+    const supportOutcome = row.outcomes.find(
+      (outcome) => outcome.status === "Needs Support" || outcome.status === "Needs Reassessment"
+    );
+
+    if (supportOutcome || row.supportCount > 0 || row.nextStep.includes("Rebuild")) {
+      const weakIndicator = supportOutcome?.items?.find((item) => !item.mastered)?.indicator || supportOutcome?.outcome || "next indicator";
+
+      groups.reteach.push({
+        ...row,
+        groupReason: `Needs support with ${weakIndicator}`,
+        groupFocus: supportOutcome?.outcome || weakIndicator,
+        groupMove: "Use simplified numbers, examples, or a short teacher-table lesson.",
+      });
+      return;
+    }
+
+    const readyOutcome = row.outcomes.find(
+      (outcome) => outcome.readyForAssessment && outcome.assessment.status !== "Passed"
+    );
+
+    if (readyOutcome || row.readyCount > 0 || row.nextStep.includes("assessment")) {
+      groups.assessmentReady.push({
+        ...row,
+        groupReason: `${readyOutcome?.outcome || "Outcome"} indicators are strong enough`,
+        groupFocus: readyOutcome?.outcome || "assessment",
+        groupMove: "Assign or run the outcome assessment next.",
+      });
       return;
     }
 
     if (row.masteredCount === OUTCOMES.length) {
-      groups.enrichment.push(row);
+      groups.enrichment.push({
+        ...row,
+        groupReason: "All listed outcomes are mastered",
+        groupFocus: "Enrichment",
+        groupMove: "Give challenge tasks, explanation prompts, or mixed review.",
+      });
       return;
     }
 
-    groups.practice.push(row);
+    const developingOutcome = row.outcomes.find((outcome) => outcome.status === "Developing");
+    const nextWeak = developingOutcome?.items?.find((item) => !item.mastered)?.indicator || developingOutcome?.outcome || "next indicator";
+
+    groups.practice.push({
+      ...row,
+      groupReason: `Still building ${nextWeak}`,
+      groupFocus: developingOutcome?.outcome || nextWeak,
+      groupMove: "Assign a short practice cycle and watch accuracy.",
+    });
   });
 
   return groups;
 }
-
 function getReportCardComment(display) {
   if (display.assessment.status === "Passed") {
     return "Outcome mastered through assessment.";
@@ -2312,7 +2394,7 @@ export default function App() {
           ...old,
         ]);
 
-        const targetedQuestions = buildPracticeQuestionSet(question.outcome, activeAllQuestions, skill, 5, adaptiveLevel)
+        const targetedQuestions = buildPracticeQuestionSet(question.outcome, activeAllQuestions, skill, 5, adaptiveLevel, question.indicator)
         const practiceKey = `${currentStudent}-${question.outcome}`;
         setPracticeStats((old) => ({ ...old, [practiceKey]: { before: mistakeCounts[practiceKey] || 0, after: null, improvement: null } }));
         setPracticeSession({ key: practiceKey, skill: question.outcome, attempts: 0, correct: 0, wrong: 0 });
@@ -2802,7 +2884,8 @@ export default function App() {
 
   function startOutcomePractice(outcome) {
     const nextSkill = OUTCOME_TO_SKILL[outcome] || skill;
-    const outcomeQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, nextSkill, 5);
+    const targetIndicator = getWeakestIndicatorForOutcome(indicatorStats, currentStudent, outcome);
+    const outcomeQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, nextSkill, 5, adaptiveLevel, targetIndicator);
 
     setSkill(nextSkill);
     setPracticeQueue(outcomeQuestions);
@@ -2831,7 +2914,8 @@ export default function App() {
       return;
     }
 
-    const assignedQuestions = buildPracticeQuestionSet(assignment.target, activeAllQuestions, OUTCOME_TO_SKILL[assignment.target] || skill, 5);
+    const targetIndicator = getWeakestIndicatorForOutcome(indicatorStats, currentStudent, assignment.target);
+    const assignedQuestions = buildPracticeQuestionSet(assignment.target, activeAllQuestions, OUTCOME_TO_SKILL[assignment.target] || skill, 5, adaptiveLevel, targetIndicator);
     if (assignedQuestions.length === 0) {
       startOutcomePractice(assignment.target);
       return;
@@ -2869,7 +2953,8 @@ export default function App() {
 
   function assignOutcomePractice(student, outcome) {
     setCurrentStudent(student);
-    const assignedQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, OUTCOME_TO_SKILL[outcome] || skill, 5);
+    const targetIndicator = getWeakestIndicatorForOutcome(indicatorStats, student, outcome);
+    const assignedQuestions = buildPracticeQuestionSet(outcome, activeAllQuestions, OUTCOME_TO_SKILL[outcome] || skill, 5, adaptiveLevel, targetIndicator);
     if (assignedQuestions.length === 0) return;
 
     setTeacherAssignments((prev) => ({
@@ -5211,8 +5296,8 @@ function TeacherDashboard({
           </div>
         </Card>
 
-        <Card title="Teacher Small Groups" className="screen-only">
-          <p style={styles.sectionIntro}>Use this as your fast planning view. It groups students by what they most likely need next.</p>
+        <Card title="Teacher Small Groups + Reasons" className="screen-only">
+          <p style={styles.sectionIntro}>Use this as your fast planning view. It groups students by what they most likely need next and explains why each student is there.</p>
 
           <div style={styles.groupGrid}>
             <GroupBox
@@ -6097,8 +6182,26 @@ function ProgressItem({ label, value }) {
 function GroupBox({ title, helper, rows, empty, actionLabel, onAssignGroup }) {
   return (
     <div style={styles.groupBox}>
-      <h3 style={styles.groupTitle}>{title}</h3>
-      <p style={styles.cellSubtext}>{helper}</p>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+        <div>
+          <h3 style={styles.groupTitle}>{title}</h3>
+          <p style={styles.cellSubtext}>{helper}</p>
+        </div>
+        <span
+          style={{
+            background: rows.length ? "#dbeafe" : "#f1f5f9",
+            color: rows.length ? "#1d4ed8" : "#64748b",
+            borderRadius: 999,
+            padding: "6px 10px",
+            fontWeight: 900,
+            fontSize: 12,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {rows.length}
+        </span>
+      </div>
+
       {rows.length === 0 ? (
         <p style={styles.emptyText}>{empty}</p>
       ) : (
@@ -6106,11 +6209,51 @@ function GroupBox({ title, helper, rows, empty, actionLabel, onAssignGroup }) {
           <div style={styles.groupList}>
             {rows.map((row) => (
               <div key={row.student} style={styles.groupStudent}>
-                <strong>{row.student}</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                  <strong>{row.student}</strong>
+                  {row.groupFocus && (
+                    <span
+                      style={{
+                        background: "#eef2ff",
+                        color: "#3730a3",
+                        borderRadius: 999,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {row.groupFocus}
+                    </span>
+                  )}
+                </div>
+
                 <span>{row.nextStep}</span>
+
+                {row.groupReason && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      fontSize: 13,
+                      color: "#334155",
+                    }}
+                  >
+                    <strong>Why:</strong> {row.groupReason}
+                    {row.groupMove && (
+                      <div style={{ marginTop: 4 }}>
+                        <strong>Teacher move:</strong> {row.groupMove}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
           {onAssignGroup && (
             <button type="button" onClick={onAssignGroup} style={styles.groupAssignButton}>
               {actionLabel || "Assign to Group"}
@@ -6121,7 +6264,6 @@ function GroupBox({ title, helper, rows, empty, actionLabel, onAssignGroup }) {
     </div>
   );
 }
-
 function getAssignmentLabel(assignment) {
   if (!assignment) return "";
   if (assignment.status === "completed") {
