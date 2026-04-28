@@ -95,8 +95,16 @@ function shuffleQuestions(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
-function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", count = 5) {
-  const denominators = [2, 3, 4, 5, 6, 8, 10];
+function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", count = 5, adaptiveLevel = "normal") {
+  let denominators;
+
+  if (adaptiveLevel === "easy") {
+    denominators = [2, 3, 4];
+  } else if (adaptiveLevel === "challenge") {
+    denominators = [6, 8, 10];
+  } else {
+    denominators = [4, 5, 6, 8];
+  }
   const used = new Set();
   const questions = [];
 
@@ -111,7 +119,7 @@ function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", c
     questions.push({
       id: `generated-tapbox-${outcome}-${indicator}-${key}-${Date.now()}-${questions.length}`,
       prompt: `Tap the boxes to shade ${key}.`,
-      difficulty: total <= 4 ? "easy" : total <= 6 ? "normal" : "challenge",
+      difficulty: adaptiveLevel,
       answers: [key],
       correct: key,
       tapBoxModel: {
@@ -139,9 +147,9 @@ function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", c
   return questions;
 }
 
-function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5) {
+function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5, adaptiveLevel = "normal") {
   if (outcome === "NO4") {
-    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count);
+    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count, adaptiveLevel);
   }
 
   const outcomeQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
@@ -150,9 +158,9 @@ function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "
   return shuffleQuestions(outcomeQuestions.length ? outcomeQuestions : fallback).slice(0, count);
 }
 
-function buildSkillQuestionSet(skill, activeAllQuestions, count = 5) {
+function buildSkillQuestionSet(skill, activeAllQuestions, count = 5, adaptiveLevel = "normal") {
   if (skill === "fractions") {
-    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count);
+    return buildFractionTapBoxPracticeSet("NO4", "NO4.01", count, adaptiveLevel);
   }
 
   const base = QUESTION_BANK[skill] || activeAllQuestions.slice(0, count);
@@ -1863,6 +1871,8 @@ export default function App() {
   const [alerts, setAlerts] = useState(DEFAULT_STUDENT_STATE.alerts);
   const [intervention, setIntervention] = useState(DEFAULT_STUDENT_STATE.intervention);
   const [correctStreak, setCorrectStreak] = useState(DEFAULT_STUDENT_STATE.correctStreak);
+  const [adaptiveLevel, setAdaptiveLevel] = useState("normal");
+  const [recentResults, setRecentResults] = useState([]);
   const [completedSkills, setCompletedSkills] = useState(DEFAULT_STUDENT_STATE.completedSkills);
   const [simplifiedMode, setSimplifiedMode] = useState(DEFAULT_STUDENT_STATE.simplifiedMode);
   const [practiceQueue, setPracticeQueue] = useState(DEFAULT_STUDENT_STATE.practiceQueue);
@@ -2068,8 +2078,8 @@ export default function App() {
   }, [currentStudent, outcomeStats, activeAllQuestions]);
 
   const generatedSkillQuestions = useMemo(() => {
-    return buildSkillQuestionSet(skill, activeAllQuestions, 5);
-  }, [skill, activeAllQuestions]);
+    return buildSkillQuestionSet(skill, activeAllQuestions, 5, adaptiveLevel);
+  }, [skill, activeAllQuestions, adaptiveLevel]);
 
   const questions =
   assessmentMode && assessmentQueue.length > 0
@@ -2233,6 +2243,23 @@ export default function App() {
       </div>
     );
   }
+  function recordAdaptiveResult(isCorrect) {
+    setRecentResults((prev) => {
+      const updated = [...prev, isCorrect].slice(-3);
+      const lastTwo = updated.slice(-2);
+
+      if (lastTwo.length === 2 && lastTwo.every(Boolean)) {
+        setAdaptiveLevel("challenge");
+      } else if (updated.length === 3 && updated.every((result) => !result)) {
+        setAdaptiveLevel("easy");
+      } else {
+        setAdaptiveLevel("normal");
+      }
+
+      return updated;
+    });
+  }
+
   function checkAnswer(answerOverride = null) {
         if (!question) return;
 
@@ -2259,6 +2286,8 @@ export default function App() {
 
     if (feedback && hintLevel === 0) return;
 
+    recordAdaptiveResult(isCorrect);
+
     const outcomeKey = `${currentStudent}-${question.outcome}`;
     const indicatorKey = `${currentStudent}-${question.indicator || `${question.outcome}.01`}`;
 
@@ -2283,7 +2312,7 @@ export default function App() {
           ...old,
         ]);
 
-        const targetedQuestions = buildPracticeQuestionSet(question.outcome, activeAllQuestions, skill, 5);
+        const targetedQuestions = buildPracticeQuestionSet(question.outcome, activeAllQuestions, skill, 5, adaptiveLevel)
         const practiceKey = `${currentStudent}-${question.outcome}`;
         setPracticeStats((old) => ({ ...old, [practiceKey]: { before: mistakeCounts[practiceKey] || 0, after: null, improvement: null } }));
         setPracticeSession({ key: practiceKey, skill: question.outcome, attempts: 0, correct: 0, wrong: 0 });
@@ -3302,6 +3331,7 @@ const indicatorProgressPercent = Math.min(
       <span style={styles.skillTag}>{lessonQuestion.outcome}</span>
       <span style={styles.skillTag}>{lessonQuestion.indicator || "No indicator"}</span>
       <span style={styles.skillTag}>{(lessonQuestion.difficulty || "normal").toUpperCase()}</span>
+      <span style={styles.skillTag}>Adaptive: {adaptiveLevel.toUpperCase()}</span>
     </div>
 
     <div
