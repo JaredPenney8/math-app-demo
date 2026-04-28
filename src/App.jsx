@@ -17,7 +17,7 @@ import {
   makeDefaultAdaptationRow,
 } from "./data/curriculumData";
 
-function TapBoxFractionQuestion({ total = 10, target = null, selectedCount = 0, onChange }) {
+function TapBoxFractionQuestion({ total = 10, target = null, selectedCount = 0, onChange, disabled = false }) {
   const columns = total <= 5 ? total : Math.min(total, 10);
 
   return (
@@ -58,7 +58,10 @@ function TapBoxFractionQuestion({ total = 10, target = null, selectedCount = 0, 
               key={boxNumber}
               type="button"
               aria-label={`Shade ${boxNumber} out of ${total}`}
-              onClick={() => onChange(boxNumber)}
+              onClick={() => {
+                if (!disabled) onChange(boxNumber);
+              }}
+              disabled={disabled}
               style={{
                 aspectRatio: "1 / 1",
                 borderRadius: 12,
@@ -66,7 +69,8 @@ function TapBoxFractionQuestion({ total = 10, target = null, selectedCount = 0, 
                 background: isFilled ? "#2563eb" : "#ffffff",
                 color: isFilled ? "#ffffff" : "#2563eb",
                 fontWeight: 900,
-                cursor: "pointer",
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.75 : 1,
                 boxShadow: isFilled ? "0 8px 18px rgba(37, 99, 235, 0.25)" : "none",
               }}
             >
@@ -2229,11 +2233,17 @@ export default function App() {
       </div>
     );
   }
-  function checkAnswer() {
+  function checkAnswer(answerOverride = null) {
         if (!question) return;
-    if (question.type === "multi-step" ? Object.keys(multiStepAnswers).length < question.steps.length : !selected) return;
 
-    const isCorrect = question.type === "multi-step" ? question.steps.every((step, index) => multiStepAnswers[index] === step.correct) : selected === question.correct;
+    const answerToCheck = answerOverride ?? selected;
+    const multiStepToCheck = answerOverride && typeof answerOverride === "object" ? answerOverride : multiStepAnswers;
+
+    if (question.type === "multi-step" ? Object.keys(multiStepToCheck).length < question.steps.length : !answerToCheck) return;
+
+    const isCorrect = question.type === "multi-step"
+      ? question.steps.every((step, index) => multiStepToCheck[index] === step.correct)
+      : answerToCheck === question.correct;
 
     if (!isCorrect && hintLevel === 0) {
       setHintLevel(1);
@@ -3396,11 +3406,13 @@ const indicatorProgressPercent = Math.min(
         : 0
     }
     onChange={(count) => {
-      setSelected(`${count}/${lessonQuestion.tapBoxModel.total}`);
+      const answer = `${count}/${lessonQuestion.tapBoxModel.total}`;
+      setSelected(answer);
       setTimeout(() => {
-        checkAnswer();
+        checkAnswer(answer);
       }, 100);
     }}
+    disabled={feedback.includes("Correct")}
   />
 )}
 
