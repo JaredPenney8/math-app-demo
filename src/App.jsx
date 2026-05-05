@@ -471,7 +471,7 @@ const styles = {
   tallyRow: { fontSize: 34, letterSpacing: 4, fontWeight: 950, color: "#334155", background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12 },
   numberLineRow: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
   numberBubble: { minWidth: 44, minHeight: 44, borderRadius: 999, background: "white", border: "2px solid #cbd5e1", display: "grid", placeItems: "center", fontWeight: 950 },
-  patternRow: { display: "flex", gap: 10, flexWrap: "wrap" },
+  patternRowWrap: { display: "flex", gap: 10, flexWrap: "wrap" },
   patternToken: { width: 48, height: 48, borderRadius: 14, background: "white", border: "1px solid #cbd5e1", display: "grid", placeItems: "center", fontSize: 24, fontWeight: 950 },
   balanceRow: { display: "grid", gridTemplateColumns: "1fr 56px 1fr", gap: 10, alignItems: "center", textAlign: "center", fontSize: 24, fontWeight: 950 },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, minmax(38px, 1fr))", gap: 6 },
