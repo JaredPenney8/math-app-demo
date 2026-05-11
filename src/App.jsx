@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import TeacherDashboard from "./components/TeacherDashboard";
 import StudentDashboard from "./components/StudentDashboard";
+import FractionModel from "./components/FractionModel";
 import { loadClassStudents } from "./firebaseClient";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "./firebaseClient";
@@ -30,6 +31,11 @@ import {
   ADAPTATION_OPTIONS,
   makeDefaultAdaptationRow,
 } from "./data/curriculumData";
+
+import {
+  FRACTION_QUESTIONS,
+  DECIMAL_QUESTIONS,
+} from "./data/questionBank";
 
 const styles = {
   outcomePathList: {
@@ -256,9 +262,64 @@ const styles = {
   fractionPart: { height: 64, border: "1px solid #cbd5e1", cursor: "pointer" },
   decimalGrid: { display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 3, maxWidth: 440 },
   decimalCell: { height: 42, border: "1px solid #cbd5e1", borderRadius: 6 },
-  answers: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 },
-  answer: { padding: "12px 16px", borderRadius: 14, border: "1px solid #cbd5e1", background: "white", fontWeight: 900, cursor: "pointer", minWidth: 88 },
-  selectedAnswer: { padding: "12px 16px", borderRadius: 14, border: "2px solid #2563eb", background: "#dbeafe", color: "#1d4ed8", fontWeight: 900, cursor: "pointer", minWidth: 88 },
+  answers: {
+  display: "flex",
+  gap: 14,
+  flexWrap: "wrap",
+  marginTop: 18,
+  justifyContent: "center",
+},
+
+answer: {
+  padding: "18px 20px",
+  borderRadius: 24,
+  border: "3px solid #bfdbfe",
+  background: "linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)",
+  fontWeight: 900,
+  fontSize: 18,
+  color: "#0f172a",
+  cursor: "pointer",
+  minWidth: 120,
+  minHeight: 78,
+  boxShadow:
+    "0 14px 28px rgba(37,99,235,0.10), 0 4px 10px rgba(15,23,42,0.06)",
+  transition:
+    "transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border 0.12s ease",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  position: "relative",
+  overflow: "hidden",
+  touchAction: "manipulation",
+  userSelect: "none",
+},
+  selectedAnswer: {
+  padding: "18px 20px",
+  borderRadius: 24,
+  border: "3px solid #2563eb",
+  background:
+    "linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%)",
+  color: "#1e3a8a",
+  fontWeight: 950,
+  fontSize: 18,
+  cursor: "pointer",
+  minWidth: 120,
+  minHeight: 78,
+  boxShadow:
+    "0 18px 32px rgba(37,99,235,0.22), 0 6px 14px rgba(37,99,235,0.12)",
+  transform: "translateY(-2px) scale(1.035)",
+  transition:
+    "transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  position: "relative",
+  overflow: "hidden",
+  touchAction: "manipulation",
+  userSelect: "none",
+},
   multiStepBox: { display: "grid", gap: 12 },
   stepCard: { border: "1px solid #e2e8f0", borderRadius: 16, padding: 14, background: "#ffffff" },
   feedback: { fontWeight: 800, padding: 12, background: "#f8fafc", borderRadius: 14, border: "1px solid #e2e8f0" },
@@ -490,9 +551,35 @@ const styles = {
   coverageWarningPill: { borderRadius: 999, padding: "5px 9px", background: "#fef3c7", color: "#92400e", fontSize: 11, fontWeight: 900 },
   coverageBarTrack: { height: 8, borderRadius: 999, background: "#e2e8f0", overflow: "hidden", marginTop: 10, marginBottom: 8 },
   coverageBarFill: { height: "100%", borderRadius: 999, background: "#2563eb" },
-  thinkingCard: { border: "1px solid #dbeafe", borderRadius: 16, background: "#eff6ff", padding: 14, marginTop: 14, display: "grid", gap: 8 },
-  thinkingStep: { display: "flex", alignItems: "center", gap: 10, color: "#1e3a8a", fontWeight: 750 },
-  thinkingNumber: { width: 24, height: 24, borderRadius: 999, background: "#2563eb", color: "white", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 950, flex: "0 0 auto" },
+  thinkingCard: {
+  marginTop: 12,
+  marginBottom: 14,
+  padding: 14,
+  borderRadius: 18,
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+},
+  thinkingStep: {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 10,
+  color: "#334155",
+  fontWeight: 700,
+  fontSize: 14,
+},
+ thinkingNumber: {
+  width: 26,
+  height: 26,
+  borderRadius: 999,
+  background: "#2563eb",
+  color: "#ffffff",
+  display: "grid",
+  placeItems: "center",
+  fontWeight: 900,
+  fontSize: 12,
+  flexShrink: 0,
+},
   supportBox: { border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1e3a8a", borderRadius: 14, padding: 12, marginTop: 10, fontSize: 14, lineHeight: 1.45, fontWeight: 650 },
   rosterControlsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginTop: 12 },
   rosterControlBox: { border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 16, padding: 14, display: "grid", gap: 10 },
@@ -755,7 +842,7 @@ function getAdaptationSupport(question, adaptations = {}) {
     balance: "Check both sides. If both sides have the same value, use =. If not, use ≠.",
     calendar: "Move one day at a time on the calendar and count carefully.",
     measurement: "Use equal units with no gaps and no overlaps.",
-    geometry: "Look at sides, corners, faces, curves, and flat surfaces.",
+    geometry: "Tap each shape and notice sides, corners, curved edges, and flat surfaces.",
     graph: "Read the labels first, then compare the counts or heights.",
     generic: "Read the question, use the model or clue, and match the answer to the evidence.",
   };
@@ -801,7 +888,17 @@ function applyAdaptationsToQuestion(question, adaptations = {}) {
       "Choose the answer that matches the model.",
     ];
   }
+if (adaptations.examples) {
+  adapted.showWorkedExample = true;
+}
 
+if (adaptations.formulaSheet) {
+  adapted.showFormulaReminder = true;
+}
+
+if (adaptations.readAloud) {
+  adapted.showReadAloudText = true;
+}
   return adapted;
 }
 
@@ -1332,176 +1429,105 @@ function getQuestionEditCounts(questionEdits) {
 }
 
 const QUESTION_BANK = {
-  fractions: [
-    {
-      prompt: "Tap the boxes to shade 3/4.",
-      difficulty: "easy",
-      answers: ["1/4", "2/4", "3/4"],
-      correct: "3/4",
-      tapBoxModel: {
-  total: 4,
-  target: 3,
-},
-      outcome: "NO4",
-      indicator: "NO4.01",
-      skill: "Fraction visual model",
-      mistakeIfWrong: "Misread shaded parts",
-      hint: "Count the shaded parts first, then count the total equal parts.",
-      hint2: "Write it as shaded parts / total parts. For example, 3 shaded out of 4 total is 3/4.",
-    },
-    {
-      prompt: "Which fraction shows half?",
-      difficulty: "easy",
-      answers: ["1/2", "1/3", "3/4"],
-      correct: "1/2",
-      outcome: "NO4",
-      indicator: "NO4.02",
-      skill: "Fraction visual model",
-      mistakeIfWrong: "Confusing numerator and denominator",
-      hint: "The top number tells how many parts you have. The bottom number tells how many equal parts are in the whole.",
-      hint2: "For 3/4, the 3 means selected or shaded parts. The 4 means total equal parts.",
-    },
-    {
-      prompt: "Targeted practice: What fraction is shaded?",
-      difficulty: "normal",
-      answers: ["1/4", "2/4", "3/4"],
-      correct: "3/4",
-      outcome: "NO4",
-      indicator: "NO4.01",
-      skill: "Fraction visual model",
-      mistakeIfWrong: "Misread shaded parts",
-      hint: "Count the shaded parts first, then count the total equal parts.",
-      hint2: "Write it as shaded parts / total parts. For example, 3 shaded out of 4 total is 3/4.",
-    },
-    {
-      prompt: "Targeted practice: Which fraction shows 3 out of 4?",
-      difficulty: "normal",
-      answers: ["3/4", "1/4", "4/3"],
-      correct: "3/4",
-      outcome: "NO4",
-      indicator: "NO4.02",
-      skill: "Fraction visual model",
-      mistakeIfWrong: "Confusing numerator and denominator",
-      hint: "The top number tells how many parts you have. The bottom number tells how many equal parts are in the whole.",
-      hint2: "For 3/4, the 3 means selected or shaded parts. The 4 means total equal parts.",
-    },
-    {
-      prompt: "Challenge: Build an equivalent fraction for 3/4.",
-      difficulty: "challenge",
-      type: "multi-step",
-      steps: [
-        {
-          prompt: "Step 1: If we multiply the denominator 4 by 2, what denominator do we get?",
-          answers: ["6", "8", "12"],
-          correct: "8",
-        },
-        {
-          prompt: "Step 2: To keep the fraction equivalent, what should we multiply the numerator 3 by?",
-          answers: ["2", "3", "4"],
-          correct: "2",
-        },
-        {
-          prompt: "Step 3: What equivalent fraction do we get?",
-          answers: ["6/8", "2/8", "4/6"],
-          correct: "6/8",
-        },
-      ],
-      answers: ["6/8", "2/8", "4/6"],
-      correct: "6/8",
-      outcome: "NO4",
-      indicator: "NO4.03",
-      skill: "Equivalent fractions",
-      mistakeIfWrong: "Equivalent fraction misunderstanding",
-      hint: "Equivalent fractions name the same amount. Try multiplying the top and bottom by the same number.",
-      hint2: "3/4 × 2/2 = 6/8, so 6/8 names the same amount as 3/4.",
-    },
-  ],
-  decimals: [
-    {
-      prompt: "Which decimal is bigger?",
-      difficulty: "easy",
-      answers: ["0.5", "0.7", "0.2"],
-      correct: "0.7",
-      outcome: "NO7",
-      indicator: "NO7.02",
-      skill: "Compare decimals",
-      mistakeIfWrong: "Decimal comparison error",
-      hint: "Compare the tenths first. The digit right after the decimal is the tenths place.",
-      hint2: "0.7 has 7 tenths. 0.5 has 5 tenths. More tenths means the decimal is larger.",
-    },
-    {
-      prompt: "What is 3 tenths as a decimal?",
-      difficulty: "easy",
-      answers: ["0.3", "3.0", "0.03"],
-      correct: "0.3",
-      outcome: "NO7",
-      indicator: "NO7.01",
-      skill: "Tenths as decimals",
-      mistakeIfWrong: "Tenths place misunderstanding",
-      hint: "Tenths mean parts out of 10. Three tenths is written as 0.3.",
-      hint2: "The digit 3 goes in the tenths place, right after the decimal point.",
-    },
-    {
-      prompt: "Targeted practice: Which decimal is bigger?",
-      difficulty: "normal",
-      answers: ["0.4", "0.8", "0.3"],
-      correct: "0.8",
-      outcome: "NO7",
-      indicator: "NO7.02",
-      skill: "Compare decimals",
-      mistakeIfWrong: "Decimal comparison error",
-      hint: "Compare the tenths first. The digit right after the decimal is the tenths place.",
-      hint2: "0.8 has 8 tenths. 0.4 has 4 tenths. More tenths means the decimal is larger.",
-    },
-    {
-      prompt: "Targeted practice: What is 7 tenths as a decimal?",
-      difficulty: "normal",
-      answers: ["0.7", "7.0", "0.07"],
-      correct: "0.7",
-      outcome: "NO7",
-      indicator: "NO7.01",
-      skill: "Tenths as decimals",
-      mistakeIfWrong: "Tenths place misunderstanding",
-      hint: "Tenths mean parts out of 10. Seven tenths is written as 0.7.",
-      hint2: "The digit 7 goes in the tenths place, right after the decimal point.",
-    },
-    {
-      prompt: "Challenge: Compare decimals using a benchmark.",
-      difficulty: "challenge",
-      type: "multi-step",
-      steps: [
-        {
-          prompt: "Step 1: Which benchmark is 0.75 equal to?",
-          answers: ["one half", "three quarters", "one tenth"],
-          correct: "three quarters",
-        },
-        {
-          prompt: "Step 2: Which two tenths is 0.75 between?",
-          answers: ["0.5 and 0.6", "0.7 and 0.8", "0.8 and 0.9"],
-          correct: "0.7 and 0.8",
-        },
-        {
-          prompt: "Step 3: Which choice is closest to 0.75?",
-          answers: ["0.7", "0.8", "0.5"],
-          correct: "0.8",
-        },
-      ],
-      answers: ["0.7", "0.8", "0.5"],
-      correct: "0.8",
-      outcome: "NO7",
-      indicator: "NO7.03",
-      skill: "Decimal benchmarks",
-      mistakeIfWrong: "Decimal benchmark comparison error",
-      hint: "Use 0.75 as three quarters. Check which choice is closest on a number line.",
-      hint2: "0.75 is halfway between 0.7 and 0.8, but 0.8 is one of the closest choices.",
-    },
-  ],
+  fractions: FRACTION_QUESTIONS,
+  decimals: DECIMAL_QUESTIONS,
 };
 
-const ALL_QUESTIONS = [...Object.values(QUESTION_BANK).flat(), ...GRADE2_GENERATED_QUESTIONS];
+const GEOMETRY_PATHWAY_QUESTIONS = [
+  {
+    id: "geometry-shapes-1",
+    prompt: "Which shape has 4 equal sides?",
+    readAloudText:
+      "Which shape has 4 equal sides? The choices are square, circle, and triangle.",
+    answers: ["square", "circle", "triangle"],
+    correct: "square",
+    outcome: "G01",
+    indicator: "G01.01",
+    skill: "Shapes",
+    visualType: "geometry",
+    difficulty: "easy",
+    modelLabel: "square, circle, triangle",
+    thinkingSteps: [
+      "Look at the sides.",
+      "Find the shape with 4 sides.",
+      "Check that all 4 sides are equal.",
+    ],
+    curriculumText: "Identify and describe 2-D shapes.",
+  },
+  {
+    id: "geometry-shapes-2",
+    prompt: "Which shape has no corners?",
+    readAloudText:
+      "Which shape has no corners? The choices are circle, square, and rectangle.",
+    answers: ["circle", "square", "rectangle"],
+    correct: "circle",
+    outcome: "G01",
+    indicator: "G01.02",
+    skill: "Shapes",
+    visualType: "geometry",
+    difficulty: "easy",
+    modelLabel: "circle, square, rectangle",
+    thinkingSteps: [
+      "Look for corners.",
+      "A corner is where two sides meet.",
+      "Choose the shape with no corners.",
+    ],
+    curriculumText: "Compare attributes of 2-D shapes.",
+  },
+  {
+    id: "geometry-shapes-3",
+    prompt: "Which shape has 3 sides?",
+    readAloudText:
+      "Which shape has 3 sides? The choices are triangle, square, and circle.",
+    answers: ["triangle", "square", "circle"],
+    correct: "triangle",
+    outcome: "G01",
+    indicator: "G01.03",
+    skill: "Shapes",
+    visualType: "geometry",
+    difficulty: "easy",
+    modelLabel: "triangle, square, circle",
+    thinkingSteps: [
+      "Count the sides.",
+      "Look for the shape with exactly 3 sides.",
+      "Match the shape name to the model.",
+    ],
+    curriculumText: "Identify triangles by their attributes.",
+  },
+  {
+    id: "geometry-shapes-4",
+    prompt: "Which attribute could sort these shapes?",
+    readAloudText:
+      "Which attribute could sort these shapes? The choices are curved sides or straight sides, colour only, or how heavy it is.",
+    answers: [
+      "curved sides or straight sides",
+      "colour only",
+      "how heavy it is",
+    ],
+    correct: "curved sides or straight sides",
+    outcome: "G01",
+    indicator: "G01.04",
+    skill: "Shapes",
+    visualType: "geometry",
+    difficulty: "normal",
+    modelLabel: "square, circle, triangle",
+    thinkingSteps: [
+      "Look at what the shapes have.",
+      "Compare sides and corners.",
+      "Choose an attribute that describes the shapes.",
+    ],
+    curriculumText: "Sort shapes using attributes.",
+  },
+];
+
+const ALL_QUESTIONS = [
+  ...GEOMETRY_PATHWAY_QUESTIONS,
+  ...Object.values(QUESTION_BANK).flat(),
+  ...GRADE2_GENERATED_QUESTIONS,
+];
 const OUTCOMES = Object.keys(INDICATOR_CATALOG);
 const DEFAULT_STUDENT_STATE = {
-  studentScreen: "today",
+  studentScreen: "strands",
   skill: "fractions",
   questionIndex: 0,
   selected: "",
@@ -2836,7 +2862,10 @@ export default function App() {
   const [hasLoadedSave, setHasLoadedSave] = useState(false);
 
   const [studentScreen, setStudentScreen] = useState(DEFAULT_STUDENT_STATE.studentScreen);
-  const [skill, setSkill] = useState(DEFAULT_STUDENT_STATE.skill);
+const [selectedStrand, setSelectedStrand] = useState("Geometry");
+const [selectedPathwaySkill, setSelectedPathwaySkill] = useState(null);
+
+const [skill, setSkill] = useState(DEFAULT_STUDENT_STATE.skill);
   const [questionIndex, setQuestionIndex] = useState(DEFAULT_STUDENT_STATE.questionIndex);
   const [selected, setSelected] = useState(DEFAULT_STUDENT_STATE.selected);
   const [multiStepAnswers, setMultiStepAnswers] = useState(DEFAULT_STUDENT_STATE.multiStepAnswers);
@@ -2865,6 +2894,7 @@ export default function App() {
   const [outcomeStats, setOutcomeStats] = useState(DEFAULT_STUDENT_STATE.outcomeStats);
   const [indicatorStats, setIndicatorStats] = useState(DEFAULT_STUDENT_STATE.indicatorStats);
   const [completionResult, setCompletionResult] = useState(DEFAULT_STUDENT_STATE.completionResult);
+    const [supportUsage, setSupportUsage] = useState(DEFAULT_STUDENT_STATE.supportUsage);
   const [questionEdits, setQuestionEdits] = useState(DEFAULT_STUDENT_STATE.questionEdits);
   const [interventionLog, setInterventionLog] = useState(DEFAULT_STUDENT_STATE.interventionLog);
   const [interventionPlans, setInterventionPlans] = useState(DEFAULT_STUDENT_STATE.interventionPlans);
@@ -2893,6 +2923,9 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
     : localVisibleStudents;
   const currentAdaptations = studentAdaptations[currentStudent] || buildDefaultAdaptations()[currentStudent] || {};
   const currentStudentGrade = studentGradeLevels[currentStudent] || selectedGrade;
+  const showStudentChrome =
+  studentScreen !== "lesson" &&
+  studentScreen !== "strands";
 
   useEffect(() => {
     if (!authUser) return;
@@ -2936,6 +2969,13 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
     setOutcomeStats(data.outcomeStats ?? {});
     setIndicatorStats(data.indicatorStats ?? {});
     setCompletionResult(data.completionResult ?? null);
+        setSupportUsage(
+      data.supportUsage ?? {
+        readAloudUsed: 0,
+        exampleOpened: 0,
+        reminderOpened: 0,
+      }
+    );
     setQuestionEdits(data.questionEdits ?? {});
     setInterventionLog(data.interventionLog ?? []);
     setInterventionPlans(data.interventionPlans ?? []);
@@ -2974,6 +3014,7 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
       outcomeStats,
       indicatorStats,
       completionResult,
+            supportUsage,
       questionEdits,
       interventionLog,
       interventionPlans,
@@ -3229,19 +3270,135 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
   }, [currentStudent, outcomeStats, activeAllQuestions]);
 
   const generatedSkillQuestions = useMemo(() => {
-    return buildSkillQuestionSet(skill, activeAllQuestions, 5, adaptiveLevel);
-  }, [skill, activeAllQuestions, adaptiveLevel]);
+  return buildSkillQuestionSet(skill, activeAllQuestions, 5, adaptiveLevel);
+}, [skill, activeAllQuestions, adaptiveLevel]);
 
-  const questions =
-  assessmentMode && assessmentQueue.length > 0
+const pathwaySkillQuestions = useMemo(() => {
+  if (!selectedPathwaySkill) return null;
+
+  const visualTypeMap = {
+    shapes: "geometry",
+    angles: "geometry",
+    area: "measurement",
+    perimeter: "measurement",
+  };
+
+  const targetVisualType = visualTypeMap[selectedPathwaySkill];
+
+  if (!targetVisualType) return null;
+
+  const matches = activeAllQuestions.filter(
+    (question) => question.visualType === targetVisualType
+  );
+
+  return matches.length ? matches.slice(0, 6) : null;
+}, [selectedPathwaySkill, activeAllQuestions]);
+
+const questions =
+  pathwaySkillQuestions
+    ? pathwaySkillQuestions
+    : assessmentMode && assessmentQueue.length > 0
     ? assessmentQueue
     : practiceMode && practiceQueue.length > 0
     ? practiceQueue
     : weakOutcomeQuestions || generatedSkillQuestions || QUESTION_BANK[skill] || activeAllQuestions.filter((q) => q.outcome === "N01").slice(0, 6) || [];
   const question = questions[questionIndex] ?? questions[0] ?? null;
-  const currentAssignment = teacherAssignments[currentStudent];
-  const currentNextStep = getStudentNextStep(currentStudent, indicatorStats, assessmentStats, teacherAssignments);
-  const currentTodayPlan = getStudentTodayPlan(currentStudent, indicatorStats, assessmentStats, teacherAssignments);
+ const currentAssignment = teacherAssignments[currentStudent];
+const currentNextStep = getStudentNextStep(currentStudent, indicatorStats, assessmentStats, teacherAssignments);
+const currentTodayPlan = getStudentTodayPlan(currentStudent, indicatorStats, assessmentStats, teacherAssignments);
+
+const STRAND_ICONS = {
+  Geometry: "🔷",
+  Measurement: "📏",
+  Patterns: "🔁",
+  Number: "🔢",
+  Data: "📊",
+};
+
+const STRAND_THEMES = {
+  Geometry: {
+    accent: "#6366f1",
+    soft: "#eef2ff",
+    border: "#c7d2fe",
+  },
+  Measurement: {
+    accent: "#16a34a",
+    soft: "#ecfdf3",
+    border: "#bbf7d0",
+  },
+  Patterns: {
+    accent: "#ea580c",
+    soft: "#fff7ed",
+    border: "#fed7aa",
+  },
+  Number: {
+    accent: "#2563eb",
+    soft: "#eff6ff",
+    border: "#bfdbfe",
+  },
+  Data: {
+    accent: "#0f766e",
+    soft: "#f0fdfa",
+    border: "#99f6e4",
+  },
+};
+
+const STRAND_PATHWAYS = {
+  Geometry: [
+    {
+      id: "shapes",
+      icon: "🔷",
+      title: "Shapes",
+      description: "Explore 2D and 3D shapes.",
+      progress: 65,
+currentFocus: true,
+completed: false,
+    },
+    {
+      id: "area",
+      icon: "▦",
+      title: "Area",
+      description: "Understand space inside shapes.",
+      progress: 100,
+currentFocus: false,
+completed: true,
+    },
+    {
+      id: "perimeter",
+      icon: "📏",
+      title: "Perimeter",
+      description: "Measure around shapes.",
+      progress: 10,
+      currentFocus: false,
+    },
+    {
+        id: "angles",
+  icon: "∠",
+  title: "Angles",
+  description: "Learn about turns and corners.",
+  progress: 0,
+  currentFocus: false,
+},
+{
+  id: "symmetry",
+  icon: "🪞",
+  title: "Symmetry",
+  description: "Coming soon after shapes and angles.",
+  progress: 0,
+  currentFocus: false,
+  locked: true,
+},
+{
+  id: "building",
+  icon: "🧱",
+  title: "Build & Compare",
+  description: "Use shapes to build and compare designs.",
+  progress: 0,
+  currentFocus: false,
+  locked: true,
+},
+  ],
+};
 
   function addInterventionLog(entry) {
     const logItem = {
@@ -3493,9 +3650,12 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
 
     if (question.type === "multi-step" ? Object.keys(multiStepToCheck).length < question.steps.length : !answerToCheck) return;
 
-    const isCorrect = question.type === "multi-step"
-      ? question.steps.every((step, index) => multiStepToCheck[index] === step.correct)
-      : answerToCheck === question.correct;
+    const role = question.practiceRole || "general";
+
+const isCorrect =
+  question.type === "multi-step"
+    ? question.steps.every((step, index) => multiStepToCheck[index] === step.correct)
+    : answerToCheck === question.correct;
 
     setAnswerState(isCorrect ? "correct" : "wrong");
     setTimeout(() => setAnswerState(null), 650);
@@ -3585,18 +3745,36 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
       },
     }));
 
-    if (practiceMode) {
-      setPracticeSession((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          attempts: (prev.attempts || 0) + 1,
-          correct: (prev.correct || 0) + (isCorrect ? 1 : 0),
-          wrong: (prev.wrong || 0) + (isCorrect ? 0 : 1),
-        };
-      });
+   if (practiceMode) {
+  setPracticeSession((prev) => {
+    if (!prev) return prev;
+
+    const roleStats = {
+  focus: { attempts: prev.roleStats?.focus?.attempts || 0, correct: prev.roleStats?.focus?.correct || 0 },
+  support: { attempts: prev.roleStats?.support?.attempts || 0, correct: prev.roleStats?.support?.correct || 0 },
+  review: { attempts: prev.roleStats?.review?.attempts || 0, correct: prev.roleStats?.review?.correct || 0 },
+  general: { attempts: prev.roleStats?.general?.attempts || 0, correct: prev.roleStats?.general?.correct || 0 },
+};
+
+    const roleKey = role.toLowerCase();
+
+    if (!roleStats[roleKey]) {
+      roleStats[roleKey] = { attempts: 0, correct: 0 };
     }
 
+    roleStats[roleKey].attempts += 1;
+    if (isCorrect) roleStats[roleKey].correct += 1;
+
+    return {
+      ...prev,
+      attempts: (prev.attempts || 0) + 1,
+      correct: (prev.correct || 0) + (isCorrect ? 1 : 0),
+      wrong: (prev.wrong || 0) + (isCorrect ? 0 : 1),
+      roleStats,
+    };
+  });
+}
+   
     if (assessmentMode) {
       setAssessmentSession((prev) => {
         if (!prev) return prev;
@@ -3645,17 +3823,42 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
         },
       }));
     }
+const totalSupportUses =
+  (supportUsage?.readAloudUsed || 0) +
+  (supportUsage?.exampleOpened || 0) +
+  (supportUsage?.reminderOpened || 0);
 
+const supportInsight =
+  totalSupportUses >= 5
+    ? "High support use during this practice session. Consider a short teacher check-in before increasing independence."
+    : supportUsage?.exampleOpened >= 3
+    ? "Worked examples were used repeatedly. Student may benefit from guided modelling before independent practice."
+    : supportUsage?.readAloudUsed >= 3
+    ? "Read-aloud support was used repeatedly. Continue monitoring independent reading/access needs."
+    : supportUsage?.reminderOpened >= 3
+    ? "Strategy reminders were used repeatedly. Student may benefit from a quick review of the key strategy."
+    : totalSupportUses > 0
+    ? "Student used available supports during practice."
+    : "Student completed practice without opening recorded supports.";
+    const status = accuracy >= 80 ? "Improved" : "Needs more practice";
+const completedAt = new Date().toLocaleDateString();
+const nextStep =
+  accuracy >= 80
+    ? "Continue with the next skill or assign a mastery check."
+    : "Review the missed skill and assign a short targeted practice cycle.";
     const result = {
-      type: "Practice",
-      target,
-      accuracy,
-      attempts,
-      correct,
-      status: accuracy >= 80 ? "Completed - Improved" : "Completed - Needs more practice",
-      completedAt: new Date().toLocaleDateString(),
-      nextStep: accuracy >= 80 ? `Try the ${target} assessment when your teacher assigns it.` : `Do another short practice cycle for ${target}.`,
-    };
+  type: "Practice",
+  target,
+  accuracy,
+  attempts,
+  correct,
+  roleStats: practiceSession?.roleStats || null,
+  supportUsage,
+  supportInsight,
+  status,
+  completedAt,
+  nextStep,
+};
 
     setTeacherAssignments((prev) => ({
       ...prev,
@@ -3676,48 +3879,21 @@ const [focusedGroupIndex, setFocusedGroupIndex] = useState(0);
       source: "Student Work",
       status: accuracy >= 80 ? "Improved" : "Needs Follow-Up",
     });
-
+if (totalSupportUses >= 5) {
+  addInterventionLog({
+    student: currentStudent,
+    type: "Needs Support",
+    target,
+    action: "High Support Use",
+    note: supportInsight,
+    source: "Support Analytics",
+    status: "Teacher Follow-Up Recommended",
+  });
+}
     setCompletionResult(result);
+    console.log("Practice completion result:", result);
     // 🔥 AUTO COMPLETE ASSIGNMENT (EXACT PATCH)
 
-if (userProfile?.role === "student") {
-  const assignment = teacherAssignments[currentStudent];
-
-  if (assignment && assignment.status !== "completed") {
-    const accuracy =
-      assessmentSession?.score ??
-      Math.round(
-        ((practiceSession?.correct || 0) /
-          (practiceSession?.total || 1)) *
-          100
-      );
-
-    const updatedAssignments = {
-      ...teacherAssignments,
-      [currentStudent]: {
-        ...assignment,
-        status: "completed",
-        completedAt: new Date().toISOString(),
-        result: {
-          accuracy,
-        },
-      },
-    };
-
-    // update state
-    setTeacherAssignments(updatedAssignments);
-
-    // 🔥 SAVE TO FIREBASE
-    await saveCloudStudentProgress(
-      user.uid,
-      currentStudent,
-      {
-        teacherAssignments: updatedAssignments,
-      },
-      userProfile
-    );
-  }
-}
     setPracticeSession(null);
     setPracticeMode(false);
     setPracticeQueue([]);
@@ -3726,9 +3902,16 @@ if (userProfile?.role === "student") {
     setSelected("");
     setMultiStepAnswers({});
     setFeedback("");
-    setLastMistakeType("");
-    setHintLevel(0);
-    setStudentScreen("completion");
+setLastMistakeType("");
+setHintLevel(0);
+
+setSupportUsage({
+  readAloudUsed: 0,
+  exampleOpened: 0,
+  reminderOpened: 0,
+});
+
+setStudentScreen("completion");
   }
 
   async function finishAssessmentSession() {
@@ -4563,21 +4746,108 @@ if (userProfile?.role === "student") {
     <div style={styles.page}>
       <style>{printStyles}</style>
       <style>{`
-        @keyframes tapBoxPop {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1.04); }
-        }
+  @keyframes tapBoxPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1.04); }
+  }
 
-        @keyframes tapBoxShake {
-          0% { transform: translateX(0); }
-          20% { transform: translateX(-5px); }
-          40% { transform: translateX(5px); }
-          60% { transform: translateX(-4px); }
-          80% { transform: translateX(4px); }
-          100% { transform: translateX(0); }
-        }
-      `}</style>
+  @keyframes tapBoxShake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes lessonCardEnter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes xpFloat {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+     @keyframes xpLevelPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.16);
+    }
+    100% {
+      transform: scale(1.12);
+    }
+  }
+    @keyframes lessonSuccessPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: scale(1.01);
+  }
+}
+  @keyframes lessonSupportShake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes correctAnswerGlow {
+  0% {
+    transform: scale(1.02);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes strandFocusPulse {
+  0% {
+    box-shadow: 0 14px 34px rgba(99,102,241,0.18);
+  }
+
+  50% {
+    box-shadow: 0 18px 40px rgba(99,102,241,0.28);
+  }
+
+  100% {
+    box-shadow: 0 14px 34px rgba(99,102,241,0.18);
+  }
+}
+`}</style>
       <header style={styles.header}>
         <div>
           <h1 style={styles.title}>Math App Demo</h1>
@@ -4627,7 +4897,15 @@ if (userProfile?.role === "student") {
   <StudentApp
     screen={studentScreen}
     setScreen={setStudentScreen}
-    skill={skill}
+selectedStrand={selectedStrand}
+setSelectedStrand={setSelectedStrand}
+selectedPathwaySkill={selectedPathwaySkill}
+setSelectedPathwaySkill={setSelectedPathwaySkill}
+STRAND_PATHWAYS={STRAND_PATHWAYS}
+STRAND_THEMES={STRAND_THEMES}
+STRAND_ICONS={STRAND_ICONS}
+skill={skill}
+setSkill={setSkill}
     answerState={answerState}
 setAnswerState={setAnswerState}
     question={question}
@@ -4649,6 +4927,7 @@ setAnswerState={setAnswerState}
     setSimplifiedMode={setSimplifiedMode}
     practiceMode={practiceMode}
     practiceQueue={practiceQueue}
+    practiceSession={practiceSession}
     assessmentMode={assessmentMode}
     assessmentSession={assessmentSession}
     currentAssignment={currentAssignment}
@@ -4744,7 +5023,15 @@ setLastMistakeType={setLastMistakeType}
 function StudentApp({
   screen,
   setScreen,
-  skill,
+  selectedStrand,
+  setSelectedStrand,
+  selectedPathwaySkill,
+setSelectedPathwaySkill,
+STRAND_PATHWAYS,
+STRAND_THEMES,
+STRAND_ICONS,
+skill,
+setSkill,
   adaptiveLevel,
 setAdaptiveLevel,
 answerState,
@@ -4768,6 +5055,7 @@ setAnswerState,
   setSimplifiedMode,
   practiceMode,
   practiceQueue,
+  practiceSession,
   assessmentMode,
   assessmentSession,
   currentAssignment,
@@ -4788,7 +5076,11 @@ setAnswerState,
   lastMistakeType,
 setLastMistakeType,
 }) {
-  if (!question) {
+  const showStudentChrome =
+    screen !== "lesson" &&
+    screen !== "strands";
+
+    if (!question) {
     return (
       <div style={styles.main}>
         <Card title="Loading Question">
@@ -4799,7 +5091,34 @@ setLastMistakeType,
   }
 
   const lessonQuestion = applyAdaptationsToQuestion(question, currentAdaptations) || question;
-  const adaptationSupport = lessonQuestion.adaptationSupport || getAdaptationSupport(question, currentAdaptations);
+
+const detectedFractionMatch =
+  lessonQuestion.prompt?.match(/(\d+)\/(\d+)/);
+
+const detectedTarget = detectedFractionMatch
+  ? Number(detectedFractionMatch[1])
+  : 1;
+
+const detectedTotal = detectedFractionMatch
+  ? Number(detectedFractionMatch[2])
+  : 4;
+
+const effectiveTapBoxModel =
+  lessonQuestion.tapBoxModel ||
+  (lessonQuestion.visualType === "fraction_model"
+    ? {
+        total: detectedTotal,
+        target: detectedTarget,
+      }
+    : null);
+
+const shuffledAnswers = useMemo(() => {
+  if (!lessonQuestion?.answers) return [];
+
+  return [...lessonQuestion.answers].sort(() => Math.random() - 0.5);
+}, [lessonQuestion?.prompt]);
+
+const adaptationSupport = lessonQuestion.adaptationSupport || getAdaptationSupport(question, currentAdaptations);
   const outcomeDisplay = getOutcomeDisplay(indicatorStats, assessmentStats, currentStudent, question.outcome);
   const currentIndicatorKey = `${currentStudent}-${question.indicator || `${question.outcome}.01`}`;
 const currentIndicatorProgress = indicatorStats[currentIndicatorKey] || {
@@ -4818,15 +5137,108 @@ const indicatorProgressPercent = Math.min(
   100,
   Math.round((indicatorAttempts / indicatorMasteryTarget) * 100)
 );
-  const outcomePathDisplays = OUTCOMES.map((outcome) => getOutcomeDisplay(indicatorStats, assessmentStats, currentStudent, outcome));
-  const latestTeacherMove = [...(interventionLog || [])]
-    .filter((entry) => entry && (entry.source === "Teacher" || entry.source === "Live Dashboard" || entry.type === "Teacher Note" || entry.type === "Small Group" || entry.type === "Teacher Assignment"))
-    .slice(-1)[0] || null;
+
+const lessonProgressPercent = Math.min(
+  100,
+  Math.round(((questionIndex + 1) / Math.max(totalQuestions, 1)) * 100)
+);
+
+const lessonXp = correctStreak * 10 + questionIndex * 5;
+const earnedXpThisQuestion = answerState === "correct" ? 10 : 0;
+const displayedLessonXp = lessonXp + earnedXpThisQuestion;
+const lessonLevel = Math.floor(displayedLessonXp / 50) + 1;
+const xpToNextLevel = 50 - (displayedLessonXp % 50 || 50);
+const leveledUp = answerState === "correct" && displayedLessonXp > 0 && displayedLessonXp % 50 === 0;
+const lessonAlmostComplete = questionIndex + 1 >= totalQuestions;
+
+const lessonProgressTitle = lessonAlmostComplete
+  ? "Finish Strong"
+  : correctStreak >= 3
+  ? "Combo Run"
+  : answerState === "correct"
+  ? "Math Power Up"
+  : "Lesson Progress";
+
+const lessonConfidenceMessage = lessonAlmostComplete
+  ? "You are almost done this lesson."
+  : correctStreak >= 3
+  ? "You are building a strong streak."
+  : answerState === "correct"
+  ? "That answer added to your progress."
+  : "Take your time and use the visual model.";
+
+const lessonMoodIcon = lessonAlmostComplete
+  ? "🏁"
+  : correctStreak >= 3
+  ? "🔥"
+  : answerState === "correct"
+  ? "⭐"
+  : "🧠";
+
+const lessonStatusText =
+  answerState === "correct"
+    ? "Great thinking!"
+    : answerState === "wrong"
+    ? "Learning in progress"
+    : selected
+    ? "Checking your thinking..."
+    : "Choose an answer to continue";
+
+const lessonGoalText =
+  question?.visualType === "tapBoxFraction"
+    ? "Goal: shade the correct fraction amount."
+    : question?.visualType === "fraction_model"
+    ? "Goal: use the fraction model carefully."
+    : question?.visualType === "baseTen"
+    ? "Goal: count tens and ones carefully."
+    : question?.visualType === "numberLine"
+    ? "Goal: follow the number pattern."
+    : question?.visualType === "coins"
+    ? "Goal: add the coin values together."
+        : question?.visualType === "geometry"
+    ? "Goal: use the shapes to help your thinking."
+    : question?.visualType === "graph"
+    ? "Goal: read the graph carefully."
+    : "Goal: use the model, then choose the best answer.";
+const encouragementMessages = [
+  "You are building strong math habits.",
+  "Take your time and use the visual.",
+  "Each question helps your brain grow.",
+  "You are making progress one step at a time.",
+  "Math confidence comes from practice.",
+];
+
+const rotatingEncouragement =
+  encouragementMessages[questionIndex % encouragementMessages.length];
+  const guideMessage =
+  answerState === "correct"
+    ? "Guide: I saw your thinking pay off."
+    : answerState === "wrong"
+    ? "Guide: Let’s use the visual and try the idea again."
+    : "Guide: Look at the model before you answer.";
+const outcomePathDisplays = OUTCOMES.map((outcome) =>
+  getOutcomeDisplay(indicatorStats, assessmentStats, currentStudent, outcome)
+);
+
+const latestTeacherMove = [...(interventionLog || [])]
+  .filter(
+    (entry) =>
+      entry &&
+      (entry.source === "Teacher" ||
+        entry.source === "Live Dashboard" ||
+        entry.type === "Teacher Note" ||
+        entry.type === "Small Group" ||
+        entry.type === "Teacher Assignment")
+  )
+  .slice(-1)[0] || null;
+
+  const activeStrandTheme =
+  STRAND_THEMES[selectedStrand] || STRAND_THEMES.Number;
 
   const navItems = [
     { id: "today", label: "Today", helper: "Next step" },
     { id: "lesson", label: "Lesson", helper: `${questionIndex + 1}/${totalQuestions}` },
-    { id: "path", label: "Path", helper: "Outcomes" },
+    { id: "strands", label: "Path", helper: "Math Worlds" },
     { id: "mini", label: "Mini", helper: "Support" },
     ...(completionResult ? [{ id: "completion", label: "Done", helper: "Results" }] : []),
   ];
@@ -4856,6 +5268,8 @@ const indicatorProgressPercent = Math.min(
           </button>
         )}
       </div>
+      {showStudentChrome && (
+  <>
       <div style={styles.studentHero}>
         <div>
           <p style={styles.eyebrow}>Student dashboard</p>
@@ -4930,6 +5344,801 @@ const indicatorProgressPercent = Math.min(
           )}
         </Card>
       )}
+  </>
+)}
+{screen === "strands" && (
+  <Card title="Choose Your Math World">
+    <div style={{ textAlign: "center", marginBottom: 18 }}>
+      <p style={styles.eyebrowDark}>Start learning</p>
+
+      <h2
+        style={{
+          margin: "6px 0 8px",
+          fontSize: "clamp(28px, 6vw, 42px)",
+          lineHeight: 1.05,
+          fontWeight: 950,
+          color: "#0f172a",
+          letterSpacing: "-0.03em",
+        }}
+      >
+        Choose your math path
+      </h2>
+
+      <p
+        style={{
+          ...styles.sectionIntro,
+          margin: "0 auto",
+          maxWidth: 520,
+        }}
+      >
+        Pick one area. We’ll guide you one step at a time.
+      </p>
+    </div>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: 14,
+      }}
+    >
+      {[
+  {
+    icon: "🔢",
+    title: "Number",
+    note: "Numbers and operations",
+    progress: 100,
+    completed: true,
+  },
+  {
+    icon: "🔁",
+    title: "Patterns",
+    note: "Patterns and rules",
+    progress: 28,
+  },
+  {
+    icon: "📏",
+    title: "Measurement",
+    note: "Length, time, money",
+    progress: 41,
+  },
+  {
+    icon: "🔷",
+    title: "Geometry",
+    note: "Shapes and space",
+    progress: 42,
+    currentFocus: true,
+  },
+  {
+    icon: "📊",
+    title: "Data",
+    note: "Graphs and chance",
+    progress: 12,
+    locked: true,
+  },
+]
+     
+    .map((strand) => (
+     <button
+  key={strand.title}
+  type="button"
+  onMouseEnter={(e) => {
+  if (strand.locked) return;
+
+  e.currentTarget.style.transform = "translateY(-2px)";
+
+  const action = e.currentTarget.querySelector(".strand-action");
+
+  if (action) {
+    action.style.transform = "scale(1.03)";
+  }
+
+  e.currentTarget.style.boxShadow = "0 14px 30px rgba(15,23,42,0.10)";
+}}
+  onMouseLeave={(e) => {
+  if (strand.locked) return;
+
+  e.currentTarget.style.transform = "translateY(0)";
+  e.currentTarget.style.boxShadow = strand.currentFocus
+    ? "0 14px 34px rgba(99,102,241,0.18)"
+    : "0 8px 20px rgba(15,23,42,0.06)";
+}}
+  onClick={() => {
+  if (strand.locked) return;
+
+  setSelectedStrand(strand.title);
+  setScreen("strand-pathway");
+}}
+  style={{
+    minHeight: 170,
+    padding: 22,
+    borderRadius: 24,
+   border: strand.completed
+  ? "2px solid #86efac"
+  : strand.currentFocus
+  ? "2px solid #6366f1"
+  : "1px solid #dbeafe",
+background: strand.completed
+  ? "linear-gradient(180deg, #ffffff, #f0fdf4)"
+  : strand.currentFocus
+  ? "linear-gradient(180deg, #ffffff, #eef2ff)"
+  : "linear-gradient(180deg, #ffffff, #f8fafc)",
+boxShadow: strand.currentFocus
+  ? "0 14px 34px rgba(99,102,241,0.18)"
+  : "0 8px 20px rgba(15,23,42,0.06)",
+    cursor: strand.locked ? "not-allowed" : "pointer",
+opacity: strand.locked ? 0.58 : 1,
+textAlign: "left",
+transition: "all 0.18s ease",
+transform: "translateY(0)",
+animation: strand.currentFocus
+  ? "strandFocusPulse 2.6s ease-in-out infinite"
+  : "none",
+}}
+>
+  <div
+  style={{
+    fontSize: 54,
+    marginBottom: 12,
+  }}
+>
+  {strand.icon}
+</div>
+
+{strand.completed && (
+  <div
+    style={{
+      display: "inline-block",
+      marginBottom: 10,
+      padding: "5px 10px",
+      borderRadius: 999,
+      background: "#dcfce7",
+      color: "#15803d",
+      border: "1px solid #86efac",
+      fontSize: 11,
+      fontWeight: 950,
+    }}
+  >
+    ✓ Completed
+  </div>
+)}
+
+{strand.locked && (
+  <div
+    style={{
+      display: "inline-block",
+      marginBottom: 10,
+      padding: "5px 10px",
+      borderRadius: 999,
+      background: "#f1f5f9",
+      color: "#64748b",
+      border: "1px solid #e2e8f0",
+      fontSize: 11,
+      fontWeight: 950,
+    }}
+  >
+    Coming Soon
+  </div>
+)}
+
+{strand.currentFocus && (
+  <div
+    style={{
+      display: "inline-block",
+      marginBottom: 10,
+      padding: "5px 10px",
+      borderRadius: 999,
+      background: "#eef2ff",
+      color: "#4338ca",
+      border: "1px solid #c7d2fe",
+      fontSize: 11,
+      fontWeight: 950,
+    }}
+  >
+    Current Class Focus
+  </div>
+)}
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 950,
+              color: "#0f172a",
+            }}
+          >
+            {strand.title}
+          </div>
+
+          {strand.currentFocus && (
+  <div
+    style={{
+      marginBottom: 10,
+      fontSize: 12,
+      fontWeight: 900,
+      color: "#4338ca",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+    }}
+  >
+    Teacher Recommended
+  </div>
+)}
+
+          <div
+  style={{
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#64748b",
+  }}
+>
+  {strand.note}
+</div>
+
+<div
+  style={{
+    marginTop: 14,
+  }}
+>
+  <div
+    style={{
+      height: 10,
+      borderRadius: 999,
+      background: "#e2e8f0",
+      overflow: "hidden",
+      marginBottom: 6,
+    }}
+  >
+    <div
+      style={{
+        width: `${strand.progress || 0}%`,
+        height: "100%",
+        borderRadius: 999,
+       background: strand.locked
+  ? "#cbd5e1"
+  : strand.currentFocus
+  ? "#6366f1"
+  : "#2563eb",
+      }}
+    />
+  </div>
+
+  <div
+    style={{
+      fontSize: 12,
+      fontWeight: 900,
+      color: "#64748b",
+    }}
+  >
+    {strand.progress || 0}% explored
+  </div>
+
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: 800,
+      color: "#94a3b8",
+    }}
+  >
+    {strand.currentFocus
+  ? "👥 Most students are here right now"
+  : strand.locked
+  ? "🔒 Unlocks later"
+  : "✨ Available to explore"}
+  </div>
+</div>
+
+          <div
+  className="strand-action"
+  style={{
+    marginTop: 14,
+    padding: "10px 12px",
+    borderRadius: 14,
+    background: strand.locked
+  ? "#f1f5f9"
+  : strand.currentFocus
+  ? "#4338ca"
+  : "#0f172a",
+    color: strand.locked
+  ? "#64748b"
+  : "#ffffff",
+    fontWeight: 900,
+    textAlign: "center",
+    fontSize: 13,
+  }}
+>
+  {strand.locked
+  ? "Coming Soon"
+  : strand.completed
+  ? "Review Pathway"
+  : strand.currentFocus
+  ? "Continue Learning"
+  : "Start Pathway"}
+</div>
+
+</button>
+              ))}
+    </div>
+  </Card>
+)}
+
+<div
+  style={{
+    display: "flex",
+    justifyContent: "flex-start",
+    marginBottom: 16,
+  }}
+>
+  <button
+    type="button"
+    onClick={() => setScreen("strands")}
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 14px",
+      borderRadius: 999,
+      border: `1px solid ${activeStrandTheme.border}`,
+      background: "#ffffff",
+      color: activeStrandTheme.accent,
+      fontWeight: 900,
+      cursor: "pointer",
+    }}
+  >
+    ← Back to Strands
+  </button>
+</div>
+
+            {screen === "strand-pathway" && (
+        <Card title={`${selectedStrand} Pathway`}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div
+  style={{
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    fontSize: 12,
+    fontWeight: 900,
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+  }}
+>
+  <span>Math Worlds</span>
+
+  <span style={{ opacity: 0.45 }}>→</span>
+
+  <span style={{ color: activeStrandTheme.accent }}>
+    {selectedStrand}
+  </span>
+</div>
+
+            <h2
+              style={{
+                margin: "6px 0 10px",
+                fontSize: "clamp(30px, 6vw, 46px)",
+                lineHeight: 1.05,
+                fontWeight: 950,
+                color: "#0f172a",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              {selectedStrand}
+            </h2>
+
+            <p
+              style={{
+                ...styles.sectionIntro,
+                maxWidth: 540,
+                margin: "0 auto",
+              }}
+            >
+              Choose a skill pathway to continue building understanding.
+            </p>
+            <div
+  style={{
+    marginTop: 14,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    fontSize: 12,
+    fontWeight: 900,
+    color: "#64748b",
+    transition: "all 0.18s ease",
+  }}
+>
+  <span>Complete skills</span>
+
+  <div
+    style={{
+      width: 18,
+      height: 2,
+      borderRadius: 999,
+      background: activeStrandTheme.border,
+    }}
+  />
+
+  <span>Build confidence</span>
+
+  <div
+    style={{
+      width: 18,
+      height: 2,
+      borderRadius: 999,
+      background: activeStrandTheme.border,
+    }}
+  />
+
+  <span>Unlock assessment</span>
+</div>
+          </div>
+
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 26,
+  }}
+>
+  {(STRAND_PATHWAYS[selectedStrand] || []).map((step, index, arr) => (
+    <div
+      key={step.id}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+     <div
+  style={{
+    display: "grid",
+    justifyItems: "center",
+    gap: 6,
+  }}
+>
+  <div
+    style={{
+      width: 38,
+      height: 38,
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 18,
+      fontWeight: 900,
+      background: step.locked
+  ? "#f1f5f9"
+  : step.currentFocus
+  ? activeStrandTheme.accent
+  : step.completed
+  ? "#dcfce7"
+  : activeStrandTheme.soft,
+        boxShadow: step.currentFocus
+  ? `0 0 0 6px ${activeStrandTheme.soft}`
+  : "none",
+
+transform: step.currentFocus
+  ? "scale(1.08)"
+  : "scale(1)",
+
+transition: "all 0.22s ease",
+      color: step.locked
+  ? "#94a3b8"
+  : step.currentFocus
+  ? "#ffffff"
+  : step.completed
+  ? "#15803d"
+  : activeStrandTheme.accent,
+      border: `2px solid ${
+        step.locked ? "#e2e8f0" : activeStrandTheme.border
+      }`,
+    }}
+  >
+   {step.completed ? "✓" : step.icon}
+  </div>
+
+  <div
+    style={{
+      fontSize: 11,
+      fontWeight: 900,
+      color: step.locked ? "#94a3b8" : "#334155",
+      maxWidth: 70,
+      textAlign: "center",
+      lineHeight: 1.15,
+    }}
+  >
+    {step.title}
+  </div>
+</div>
+
+      {index < arr.length - 1 && (
+        <div
+          style={{
+            width: 34,
+            height: 4,
+            borderRadius: 999,
+            background: step.locked
+              ? "#e2e8f0"
+              : activeStrandTheme.border,
+          }}
+        />
+      )}
+    </div>
+  ))}
+</div>
+<div
+  style={{
+    marginBottom: 22,
+    padding: "14px 18px",
+    borderRadius: 20,
+    background: activeStrandTheme.soft,
+    border: `1px solid ${activeStrandTheme.border}`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    flexWrap: "wrap",
+  }}
+>
+  <div>
+    <div
+      style={{
+        fontSize: 12,
+        fontWeight: 900,
+        color: activeStrandTheme.accent,
+        marginBottom: 4,
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+      }}
+    >
+      Suggested Next
+    </div>
+
+    <div
+      style={{
+        fontSize: 18,
+        fontWeight: 950,
+        color: "#0f172a",
+      }}
+    >
+      Continue building confidence with{" "}
+{(
+  (STRAND_PATHWAYS[selectedStrand] || []).find(
+    (step) => step.currentFocus
+  )?.title || "this skill"
+)}
+    </div>
+  </div>
+
+  <div
+    style={{
+      padding: "10px 14px",
+      borderRadius: 999,
+      background: "#ffffff",
+      border: `1px solid ${activeStrandTheme.border}`,
+      fontWeight: 900,
+      color: activeStrandTheme.accent,
+      fontSize: 13,
+    }}
+  >
+      {(
+  (STRAND_PATHWAYS[selectedStrand] || []).find(
+    (step) => step.currentFocus
+  )?.title || "Current"
+)}{" "}
+Focus
+  </div>
+</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {(STRAND_PATHWAYS[selectedStrand] || []).map((skillCard) => (
+              <button
+                key={skillCard.id}
+                type="button"
+                onClick={() => {
+  if (skillCard.locked) return;
+
+  setSelectedPathwaySkill(skillCard.id);
+  
+  if (skillCard.id === "shapes" || skillCard.id === "angles") {
+    setSkill("geometry");
+  }
+
+  if (skillCard.id === "area" || skillCard.id === "perimeter") {
+    setSkill("measurement");
+  }
+
+  setScreen("lesson");
+  setScreen("lesson");
+}}
+onMouseEnter={(e) => {
+  if (skillCard.locked) return;
+
+  e.currentTarget.style.transform = "translateY(-4px)";
+}}
+
+onMouseLeave={(e) => {
+  e.currentTarget.style.transform = "translateY(0)";
+}}
+                style={{
+                  padding: 20,
+                  borderRadius: 26,
+                  border: skillCard.completed
+  ? "2px solid #86efac"
+  : skillCard.currentFocus
+  ? `2px solid ${activeStrandTheme.accent}`
+  : "1px solid #dbeafe",
+                  background: skillCard.completed
+  ? "linear-gradient(180deg, #ffffff, #f0fdf4)"
+  : skillCard.currentFocus
+  ? `linear-gradient(180deg, #ffffff, ${activeStrandTheme.soft})`
+  : "linear-gradient(180deg, #ffffff, #f8fafc)",
+                 boxShadow: skillCard.completed
+  ? "0 14px 30px rgba(134,239,172,0.25)"
+  : skillCard.currentFocus
+  ? `0 14px 30px ${activeStrandTheme.border}`
+  : "0 8px 20px rgba(15,23,42,0.06)",
+                  textAlign: "left",
+                  cursor: skillCard.locked ? "not-allowed" : "pointer",
+opacity: skillCard.locked ? 0.62 : 1,
+                  transition: "all 0.22s ease",
+transform: "translateY(0)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 46,
+                    marginBottom: 14,
+                  }}
+                >
+                  {skillCard.icon}
+                </div>
+
+{skillCard.completed && (
+  <div
+    style={{
+      display: "inline-block",
+      marginBottom: 10,
+      padding: "5px 10px",
+      borderRadius: 999,
+      background: "#dcfce7",
+      color: "#15803d",
+      border: "1px solid #86efac",
+      fontSize: 11,
+      fontWeight: 950,
+    }}
+  >
+    ✓ Completed
+  </div>
+)}
+
+{skillCard.locked && (
+  <div
+    style={{
+      display: "inline-block",
+      marginBottom: 10,
+      padding: "5px 10px",
+      borderRadius: 999,
+      background: "#f1f5f9",
+      color: "#64748b",
+      fontSize: 11,
+      fontWeight: 950,
+    }}
+  >
+    Coming Soon
+  </div>
+)}
+
+                {skillCard.currentFocus && (
+                  <div
+                    style={{
+                      display: "inline-block",
+                      marginBottom: 10,
+                      padding: "5px 10px",
+                      borderRadius: 999,
+                      background: activeStrandTheme.soft,
+color: activeStrandTheme.accent,
+border: `1px solid ${activeStrandTheme.border}`,
+fontSize: 11,
+                      fontWeight: 950,
+                    }}
+                  >
+                    Current Focus
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 950,
+                    color: "#0f172a",
+                    marginBottom: 8,
+                  }}
+                >
+                  {skillCard.title}
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    lineHeight: 1.45,
+                    marginBottom: 18,
+                  }}
+                >
+                  {skillCard.description}
+                </div>
+
+                <div
+                  style={{
+                    height: 8,
+                    borderRadius: 999,
+                    background: "#e2e8f0",
+                    overflow: "hidden",
+                    marginBottom: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${skillCard.progress}%`,
+                      height: "100%",
+                      background: "#6366f1",
+                      borderRadius: 999,
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: "#475569",
+                    marginBottom: 14,
+                  }}
+                >
+                  {skillCard.progress}% explored
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 16,
+                    padding: "12px 14px",
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    fontWeight: 900,
+                    textAlign: "center",
+                  }}
+                >
+                  {skillCard.locked ? "Coming Soon" : "Continue"}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            <button
+              type="button"
+              onClick={() => setStudentScreen("strands")}
+              style={styles.secondary}
+            >
+              ← Back to strands
+            </button>
+          </div>
+        </Card>
+      )}
 
       {screen === "today" && (
         <Card title="Today’s Plan">
@@ -5000,84 +6209,835 @@ const indicatorProgressPercent = Math.min(
       )}
 
       {screen === "lesson" && (
-  <Card title={`Question ${questionIndex + 1}/${totalQuestions}`}>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-      <span style={styles.skillTag}>{lessonQuestion.outcome}</span>
-      <span style={styles.skillTag}>{lessonQuestion.indicator || "No indicator"}</span>
-      <span style={styles.skillTag}>{(lessonQuestion.difficulty || "normal").toUpperCase()}</span>
-      <span style={styles.skillTag}>Adaptive: {adaptiveLevel.toUpperCase()}</span>
+  <Card
+  title={
+    selectedPathwaySkill
+      ? `${selectedStrand} Pathway · ${
+          selectedPathwaySkill.charAt(0).toUpperCase() +
+          selectedPathwaySkill.slice(1)
+        }`
+      : `Question ${questionIndex + 1}/${totalQuestions}`
+  }
+>{selectedPathwaySkill && (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+      gap: 12,
+      flexWrap: "wrap",
+    }}
+  >
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 14px",
+        borderRadius: 999,
+        background: activeStrandTheme.soft,
+color: activeStrandTheme.accent,
+border: `1px solid ${activeStrandTheme.border}`,
+fontWeight: 900,
+      }}
+    >
+      📍 {selectedStrand} · {selectedPathwaySkill}
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setScreen("strand-pathway")}
+      style={{
+        border: "1px solid #cbd5e1",
+        background: "#ffffff",
+        color: "#0f172a",
+        borderRadius: 14,
+        padding: "10px 14px",
+        fontWeight: 800,
+        cursor: "pointer",
+      }}
+    >
+      ← Return to pathway
+    </button>
+  </div>
+)}
+  <div
+    key={question?.id || questionIndex}
+    style={{
+      animation: "lessonCardEnter 0.22s ease",
+    }}
+  >
+    <div
+  style={{
+    marginBottom: 12,
+    padding: "10px 12px",
+    borderRadius: 18,
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 6px 18px rgba(15,23,42,0.05)",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 8,
+    }}
+  >
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <strong style={{ fontSize: 14 }}>
+        Question {questionIndex + 1} of {totalQuestions}
+      </strong>
+
+      <div style={{ display: "flex", gap: 5 }}>
+        {Array.from({ length: totalQuestions }).map((_, index) => {
+          const isComplete = index < questionIndex;
+          const isCurrent = index === questionIndex;
+
+          return (
+            <div
+              key={index}
+              style={{
+                width: isCurrent ? 16 : 8,
+                height: 8,
+                borderRadius: 999,
+                background: isComplete
+                  ? "#22c55e"
+                  : isCurrent
+                  ? "#2563eb"
+                  : "#cbd5e1",
+                transition: "all 0.22s ease",
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
 
     <div
+      style={{
+        borderRadius: 999,
+        padding: "6px 10px",
+        background: "#f8fafc",
+        color: "#334155",
+        border: "1px solid #e2e8f0",
+        fontSize: 12,
+        fontWeight: 900,
+      }}
+    >
+      ⭐ {displayedLessonXp} XP · Level {lessonLevel}
+    </div>
+  </div>
+
+    <div
+    style={{
+      height: 8,
+      borderRadius: 999,
+      background: "#e2e8f0",
+      overflow: "hidden",
+    }}
+  >
+    <div
+      style={{
+        width: `${lessonProgressPercent}%`,
+        height: "100%",
+        borderRadius: 999,
+        background: "#2563eb",
+        transition: "width 0.3s ease",
+      }}
+    />
+  </div>
+</div>
+
+<details style={{ marginBottom: 14 }}>
+  <summary
   style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: 10,
-    marginBottom: 16,
+    cursor: "pointer",
+    fontWeight: 900,
+    color: "#334155",
+    fontSize: 13,
+    marginBottom: 10,
+    listStyle: "none",
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: 999,
+    padding: "8px 12px",
+    width: "fit-content",
   }}
 >
-  <div style={styles.currentTaskCard}>
-    <div>
-      <p style={styles.eyebrowDark}>Indicator Progress</p>
-      <strong>{indicatorAttempts}/{indicatorMasteryTarget} attempts</strong>
-      <div style={styles.cellSubtext}>
-        {indicatorCorrect} correct · {indicatorAccuracy}% accuracy
-      </div>
+  💡 Need help?
+</summary>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "center",
+          marginBottom: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap",
+      marginBottom: 2,
+    }}
+  >
+    <p style={styles.eyebrowDark}>
+      {lessonMoodIcon} {lessonProgressTitle}
+    </p>
+
+        <div
+      style={{
+        borderRadius: 999,
+        padding: "4px 9px",
+        fontSize: 11,
+        fontWeight: 950,
+        background:
+          question?.difficulty === "challenge"
+            ? "#fee2e2"
+            : question?.difficulty === "easy"
+            ? "#dcfce7"
+            : "#dbeafe",
+        color:
+          question?.difficulty === "challenge"
+            ? "#991b1b"
+            : question?.difficulty === "easy"
+            ? "#166534"
+            : "#1e3a8a",
+      }}
+    >
+      {question?.difficulty === "challenge"
+        ? "Challenge"
+        : question?.difficulty === "easy"
+        ? "Warm-Up"
+        : "Practice"}
     </div>
+
+        {question?.practiceRole && (
+      <div
+        style={{
+          borderRadius: 999,
+          padding: "4px 9px",
+          fontSize: 11,
+          fontWeight: 950,
+          background:
+            question.practiceRole === "Focus"
+              ? "#eef2ff"
+              : "#fef3c7",
+          color:
+            question.practiceRole === "Focus"
+              ? "#3730a3"
+              : "#92400e",
+        }}
+      >
+        {question.practiceRole}
+      </div>
+    )}
+
+    {question?.visualType && (
+      <div
+        style={{
+          borderRadius: 999,
+          padding: "4px 9px",
+          fontSize: 11,
+          fontWeight: 950,
+          background: "#f1f5f9",
+          color: "#334155",
+        }}
+      >
+        {question.visualType === "tapBoxFraction"
+          ? "Tap Model"
+          : question.visualType === "fraction_model"
+          ? "Fraction Model"
+          : question.visualType === "baseTen"
+          ? "Base Ten"
+          : question.visualType === "numberLine"
+          ? "Number Line"
+          : question.visualType === "coins"
+          ? "Coins"
+          : question.visualType === "geometry"
+          ? "Geometry"
+          : question.visualType === "graph"
+          ? "Graph"
+          : "Visual"}
+      </div>
+    )}
   </div>
 
-  <div style={styles.currentTaskCard}>
-    <div>
-      <p style={styles.eyebrowDark}>Status</p>
-      <strong>{indicatorStatus}</strong>
-      <div style={styles.cellSubtext}>
-        Goal: 3 attempts with 80%+
-      </div>
-    </div>
+  <strong>{questionIndex + 1} of {totalQuestions}</strong>
+
+<div
+  style={{
+    display: "flex",
+    gap: 6,
+    marginTop: 10,
+    flexWrap: "wrap",
+  }}
+>
+  {Array.from({ length: totalQuestions }).map((_, index) => {
+    const isComplete = index < questionIndex;
+    const isCurrent = index === questionIndex;
+
+    return (
+      <div
+  key={index}
+  style={{
+    width: isComplete ? 14 : isCurrent ? 18 : 10,
+    height: isComplete ? 14 : 10,
+    borderRadius: 999,
+    background: isComplete
+  ? "#22c55e"
+  : isCurrent
+  ? answerState === "correct"
+    ? "#22c55e"
+    : "#2563eb"
+  : "#cbd5e1",
+          transition: "all 0.22s ease",
+          boxShadow: isCurrent
+  ? answerState === "correct"
+    ? "0 0 16px rgba(34,197,94,0.42)"
+    : "0 0 12px rgba(37,99,235,0.35)"
+  : isComplete
+  ? "0 0 10px rgba(34,197,94,0.28)"
+  : "none",
+display: "grid",
+placeItems: "center",
+fontSize: 9,
+fontWeight: 950,
+color: "#ffffff",
+transition: "all 0.22s ease",
+}}
+>
+{isComplete ? "✓" : ""}
+</div>
+    );
+  })}
+</div>
+<div
+  style={{
+    marginTop: 3,
+    color: "#64748b",
+    fontSize: 13,
+    fontWeight: 800,
+    display: "grid",
+    gap: 3,
+  }}
+>
+  <div
+  style={{
+    display: "grid",
+    gap: 2,
+  }}
+>
+  <div>{lessonConfidenceMessage}</div>
+
+  <div
+  style={{
+    display: "grid",
+    gap: 2,
+  }}
+>
+  <div
+    style={{
+      color: "#64748b",
+      fontSize: 12,
+      fontWeight: 700,
+    }}
+  >
+    {rotatingEncouragement}
   </div>
 
-  <div style={styles.currentTaskCard}>
-    <div>
-      <p style={styles.eyebrowDark}>Streak</p>
-      <strong>{correctStreak}</strong>
-      <div style={styles.cellSubtext}>
-        Correct answers in a row
-      </div>
+  <details
+  style={{
+    marginTop: 2,
+  }}
+>
+  <summary
+    style={{
+      cursor: "pointer",
+      color: "#1d4ed8",
+      fontSize: 12,
+      fontWeight: 850,
+      listStyle: "none",
+    }}
+  >
+    🦊 Guide tip
+  </summary>
+
+  <div
+    style={{
+      marginTop: 4,
+      color: "#334155",
+      fontSize: 12,
+      fontWeight: 750,
+      lineHeight: 1.35,
+    }}
+  >
+    {guideMessage}
+  </div>
+</details>
+</div>
+</div>
+
+  <div
+  style={{
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    flexWrap: "wrap",
+    color: "#334155",
+    fontWeight: 900,
+  }}
+>
+  <span>{lessonGoalText}</span>
+
+<details>
+  <summary
+    style={{
+      cursor: "pointer",
+      borderRadius: 999,
+      padding: "4px 8px",
+      background: "#ecfeff",
+      color: "#155e75",
+      border: "1px solid #a5f3fc",
+      fontSize: 11,
+      fontWeight: 950,
+      listStyle: "none",
+    }}
+  >
+    Use the visual
+  </summary>
+
+  <div
+    style={{
+      marginTop: 6,
+      color: "#334155",
+      fontSize: 12,
+      fontWeight: 750,
+      lineHeight: 1.35,
+    }}
+  >
+    Look carefully at the model before choosing an answer.
+  </div>
+</details>
+
+  {(currentAdaptations?.examples ||
+    currentAdaptations?.readAloud ||
+    currentAdaptations?.formulaSheet ||
+    currentAdaptations?.simplifiedNumbers) && (
+    <span
+      style={{
+        borderRadius: 999,
+        padding: "4px 8px",
+        background: "#fef3c7",
+        color: "#92400e",
+        border: "1px solid #fde68a",
+        fontSize: 11,
+        fontWeight: 950,
+      }}
+    >
+      Support Active
+    </span>
+  )}
+</div>
+</div>
+        </div>
+
+        <div
+  style={{
+    display: "grid",
+    gap: 8,
+    justifyItems: "end",
+  }}
+>
+  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+  <div
+  style={{
+    display: "grid",
+    gap: 2,
+    background: correctStreak > 1 ? "#fff7ed" : "#f8fafc",
+    color: correctStreak > 1 ? "#c2410c" : "#334155",
+    border: correctStreak > 1 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+    borderRadius: 999,
+    padding: "8px 12px",
+    fontWeight: 950,
+    transform: correctStreak > 1 ? "scale(1.04)" : "scale(1)",
+    transition: "all 0.22s ease",
+    minWidth: 92,
+  }}
+>
+  <div>🔥 {correctStreak} streak</div>
+
+  {correctStreak >= 3 && (
+  <div
+    style={{
+      display: "grid",
+      gap: 4,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 10,
+        fontWeight: 900,
+        color: "#ea580c",
+        letterSpacing: 0.4,
+      }}
+    >
+      COMBO BOOST
+    </div>
+
+        <div
+      style={{
+        height: 8,
+        borderRadius: 999,
+        background: "#e2e8f0",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: `${Math.min(correctStreak * 20, 100)}%`,
+          height: "100%",
+          borderRadius: 999,
+          background:
+            correctStreak >= 3
+              ? "linear-gradient(90deg, #22c55e, #16a34a)"
+              : "linear-gradient(90deg, #60a5fa, #2563eb)",
+          transition: "width 0.22s ease",
+        }}
+      />
+    </div>
+
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 850,
+        color: correctStreak >= 3 ? "#166534" : "#64748b",
+        textAlign: "right",
+      }}
+    >
+      {correctStreak >= 3
+        ? "Great focus — keep going."
+        : "Build focus with each correct answer."}
+    </div>
+  </div>
+)}
+</div>
+
+  <div
+    style={{
+      background: earnedXpThisQuestion ? "#dcfce7" : "#f8fafc",
+      color: earnedXpThisQuestion ? "#166534" : "#334155",
+      border: earnedXpThisQuestion ? "1px solid #86efac" : "1px solid #e2e8f0",
+      borderRadius: 999,
+      padding: "8px 12px",
+      fontWeight: 950,
+      transform:
+  leveledUp
+    ? "scale(1.12)"
+    : earnedXpThisQuestion
+    ? "scale(1.06)"
+    : "scale(1)",
+transition: "all 0.22s ease",
+animation:
+  leveledUp
+    ? "xpLevelPulse 0.45s ease"
+    : "none",
+    }}
+  >
+    ⭐ {displayedLessonXp} XP · Level {lessonLevel}
+  </div>
+  </div>
+
+  <div
+    style={{
+      width: 140,
+      display: "grid",
+      gap: 4,
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        fontSize: 11,
+        fontWeight: 900,
+        color: "#475569",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  <span>Focus</span>
+
+  {correctStreak >= 3 && (
+    <span
+      style={{
+        borderRadius: 999,
+        padding: "2px 6px",
+        background: "#dcfce7",
+        color: "#166534",
+        fontSize: 9,
+        fontWeight: 950,
+      }}
+    >
+      READY
+    </span>
+  )}
+</div>
+
+<span>{Math.min(correctStreak * 20, 100)}%</span>
+    </div>
+
+    <div
+      style={{
+        height: 8,
+        borderRadius: 999,
+        background: "#e2e8f0",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: `${Math.min(correctStreak * 20, 100)}%`,
+          height: "100%",
+          borderRadius: 999,
+          background:
+            correctStreak >= 3
+              ? "linear-gradient(90deg, #22c55e, #16a34a)"
+              : "linear-gradient(90deg, #60a5fa, #2563eb)",
+          transition: "width 0.22s ease",
+        }}
+      />
     </div>
   </div>
 </div>
 
+      </div>
+
+      <div
+        style={{
+          height: 14,
+          borderRadius: 999,
+          background: "#dbeafe",
+          overflow: "hidden",
+          border: "1px solid #bfdbfe",
+        }}
+      >
+        <div
+  style={{
+    width: `${lessonProgressPercent}%`,
+    height: "100%",
+    borderRadius: 999,
+    background:
+      answerState === "correct"
+        ? "linear-gradient(90deg, #2563eb, #22c55e)"
+        : "linear-gradient(90deg, #2563eb, #60a5fa)",
+    transition:
+      "width 0.35s ease, box-shadow 0.22s ease, transform 0.22s ease",
+    boxShadow:
+      answerState === "correct"
+        ? "0 0 16px rgba(34,197,94,0.55)"
+        : "none",
+    transform:
+      answerState === "correct"
+        ? "scaleY(1.08)"
+        : "scaleY(1)",
+  }}
+/>
+      </div>
+
 <div
   style={{
-    height: 12,
-    background: "#e5e7eb",
+    marginTop: 8,
+    display: "grid",
+    gap: 3,
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: 850,
+  }}
+>
+  <div
+  style={{
+    color:
+      answerState === "correct"
+        ? "#166534"
+        : answerState === "wrong"
+        ? "#c2410c"
+        : "#475569",
+    transition: "color 0.2s ease",
+  }}
+>
+  {lessonStatusText}
+</div>
+
+<div
+  style={{
+    display: "grid",
+    gap: 4,
+  }}
+>
+  <div>
+    {lessonAlmostComplete
+      ? "Final question — finish strong!"
+      : leveledUp
+      ? "New level reached! Keep the streak going."
+      : `${xpToNextLevel} XP until next level`}
+  </div>
+
+  {lessonAlmostComplete && (
+    <div
+      style={{
+        borderRadius: 14,
+        padding: "8px 10px",
+        background: "linear-gradient(135deg, #ecfeff, #f0fdf4)",
+        border: "1px solid #a5f3fc",
+        color: "#155e75",
+        fontWeight: 900,
+        fontSize: 12,
+      }}
+    >
+      🏁 You are almost ready to complete this lesson.
+    </div>
+  )}
+</div>
+
+</div>
+
+{feedback && (
+  <div
+    style={{
+      marginTop: 10,
+      fontWeight: 900,
+      color: answerState === "correct" ? "#166534" : "#92400e",
+      transform: feedback ? "translateY(0)" : "translateY(4px)",
+      opacity: feedback ? 1 : 0,
+      transition: "all 0.22s ease",
+    }}
+  >
+    <div
+  style={{
+    display: "grid",
+    gap: 4,
+    justifyItems: "start",
+  }}
+>
+  <div>
+    {leveledUp
+      ? `🎉 Level ${lessonLevel}! You are building stronger math power.`
+      : answerState === "correct"
+      ? "+10 XP — nice work!"
+      : "Keep going — learning still counts."}
+  </div>
+
+  </div>
+  </div>
+)}
+
+</details>
+
+    <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+    alignItems: "center",
+  }}
+>
+      <span style={styles.skillTag}>
+  {lessonQuestion.outcome} · {lessonQuestion.indicator || "No indicator"}
+</span>
+
+<span style={styles.skillTag}>
+  {(lessonQuestion.difficulty || "normal").toUpperCase()}
+</span>
+<span
+  style={{
+    borderRadius: 999,
+    padding: "6px 10px",
+    background: answerState === "correct" ? "#dcfce7" : "#fff7ed",
+    color: answerState === "correct" ? "#166534" : "#92400e",
+    fontSize: 12,
+    fontWeight: 950,
+    border: answerState === "correct" ? "1px solid #86efac" : "1px solid #fed7aa",
+  }}
+>
+  {answerState === "correct"
+  ? "Ready to continue"
+  : "Solve the question"}
+</span>
+    </div>
+
+    <div
+  style={{
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginBottom: 16,
+    padding: "10px 12px",
+    borderRadius: 16,
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: 850,
+  }}
+>  <span>
+    {indicatorAccuracy}% accuracy
+  </span>
+
+  <span>•</span>
+
+  <span>
+    {indicatorStatus}
+  </span>
+</div>
+
+<div
+  style={{
+    height: 6,
+    background: "#eef2f7",
     borderRadius: 999,
     overflow: "hidden",
-    marginBottom: 18,
+    marginBottom: 12,
   }}
 >
   <div
     style={{
       width: `${indicatorProgressPercent}%`,
       height: "100%",
-      background: indicatorStatus === "Mastered" ? "#16a34a" : "#2563eb",
+      background: indicatorStatus === "Mastered" ? "#22c55e" : "#93c5fd",
       borderRadius: 999,
       transition: "width 0.25s ease",
     }}
   />
 </div>
 
-    {practiceMode && (
-      <p style={styles.interventionNotice}>
-        Targeted practice: use the model first, then choose your answer.
-      </p>
-    )}
-
-    {assessmentMode && (
-      <p style={styles.interventionNotice}>
-        Assessment mode: try this independently first.
-      </p>
-    )}
+    {(practiceMode || assessmentMode) && (
+  <p
+    style={{
+      margin: "0 0 10px",
+      color: "#64748b",
+      fontSize: 13,
+      fontWeight: 800,
+      textAlign: "center",
+    }}
+  >
+    {practiceMode
+      ? "Use the model, then choose."
+      : "Try this one on your own."}
+  </p>
+)}
 
     {currentAdaptations?.examples && (
       <div style={styles.supportBox}>
@@ -5097,20 +7057,139 @@ const indicatorProgressPercent = Math.min(
       </div>
     )}
 
-    <div style={{ ...styles.analyticsCard, marginTop: 12 }}>
-      <p style={styles.eyebrowDark}>Question</p>
-      <h2 style={{ marginTop: 4 }}>{lessonQuestion.prompt}</h2>
-      {lessonQuestion.tapBoxModel && (
+   <div
+  style={{
+    ...styles.analyticsCard,
+    marginTop: 12,
+    borderRadius: 24,
+    padding: 22,
+    background: "#ffffff",
+    border:
+      selected && !feedback
+        ? "2px solid #93c5fd"
+        : "1px solid #dbeafe",
+    boxShadow:
+      selected && !feedback
+        ? "0 0 18px rgba(37,99,235,0.14)"
+        : "0 8px 22px rgba(15,23,42,0.06)",
+  }}
+>
+     <p
+  style={{
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: 900,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "#94a3b8",
+    marginBottom: 10,
+  }}
+>
+  Solve
+</p>
+
+<h2
+  style={{
+    marginTop: 0,
+    marginBottom: 28,
+    fontSize: "clamp(34px, 6vw, 52px)",
+    lineHeight: 1.08,
+    fontWeight: 950,
+    color: "#0f172a",
+    textAlign: "center",
+    letterSpacing: "-0.03em",
+    maxWidth: 900,
+    marginInline: "auto",
+  }}
+>
+  {lessonQuestion.prompt}
+</h2>
+
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 14,
+  }}
+>
+  <div
+    style={{
+      borderRadius: 999,
+      padding: "6px 12px",
+      background:
+        answerState === "correct"
+          ? "#dcfce7"
+          : answerState === "wrong"
+          ? "#ffedd5"
+          : "#eff6ff",
+      color:
+        answerState === "correct"
+          ? "#166534"
+          : answerState === "wrong"
+          ? "#9a3412"
+          : "#1d4ed8",
+      fontSize: 13,
+      fontWeight: 900,
+      border:
+        answerState === "correct"
+          ? "1px solid #86efac"
+          : answerState === "wrong"
+          ? "1px solid #fdba74"
+          : "1px solid #bfdbfe",
+      transition: "all 0.22s ease",
+    }}
+  >
+    {answerState === "correct"
+      ? "Confidence Growing"
+      : answerState === "wrong"
+      ? "Learning Moment"
+      : "Your Turn"}
+  </div>
+</div>
+
+     {lessonQuestion.visualType === "fraction_model" && (
+  <div
+    style={{
+      marginTop: 18,
+      marginBottom: 18,
+      padding: 16,
+      borderRadius: 18,
+      background: "linear-gradient(135deg, #eff6ff, #f0fdf4)",
+      border: "2px solid #bfdbfe",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 18,
+      flexWrap: "wrap",
+    }}
+  >
+    <FractionModel
+      total={effectiveTapBoxModel?.total || 4}
+      shaded={effectiveTapBoxModel?.target || 1}
+      model="circle"
+      size={140}
+    />
+
+    <FractionModel
+      total={effectiveTapBoxModel?.total || 4}
+      shaded={effectiveTapBoxModel?.target || 1}
+      model="bar"
+      size={140}
+    />
+  </div>
+)}
+
+         {effectiveTapBoxModel && (
   <TapBoxFractionQuestion
-    total={lessonQuestion.tapBoxModel.total}
-    target={lessonQuestion.tapBoxModel.target}
+    total={effectiveTapBoxModel.total}
+    target={effectiveTapBoxModel.target}
     selectedCount={
       selected && selected.includes("/")
         ? Number(selected.split("/")[0])
         : 0
     }
     onChange={(count) => {
-      const answer = `${count}/${lessonQuestion.tapBoxModel.total}`;
+      const answer = `${count}/${effectiveTapBoxModel.total}`;
       setSelected(answer);
       setTimeout(() => {
         checkAnswer(answer);
@@ -5121,13 +7200,17 @@ const indicatorProgressPercent = Math.min(
   />
 )}
 
-      {lessonQuestion.visualType && (
+      {lessonQuestion.visualType &&
+ !feedback.includes("Correct") && (
   <div style={{ marginTop: 16 }}>
-    <CurriculumVisual question={lessonQuestion} />
+    <CurriculumVisual
+  question={lessonQuestion}
+  adaptations={currentAdaptations || {}}
+/>
   </div>
 )}
 
-      {lessonQuestion.thinkingSteps && (
+      {lessonQuestion.showWorkedExample && lessonQuestion.thinkingSteps && !feedback.includes("Correct") && (
         <div style={styles.thinkingCard}>
           <strong>Think it through</strong>
           {lessonQuestion.thinkingSteps.map((step, index) => (
@@ -5140,7 +7223,7 @@ const indicatorProgressPercent = Math.min(
       )}
     </div>
 
-    {lessonQuestion.tapBoxModel ? null : lessonQuestion.type === "multi-step" ? (
+   {lessonQuestion.tapBoxModel ? null : lessonQuestion.type === "multi-step" ? (
       <div style={styles.multiStepBox}>
         {lessonQuestion.steps.map((step, index) => (
           <div key={step.prompt} style={styles.stepCard}>
@@ -5180,17 +7263,66 @@ const indicatorProgressPercent = Math.min(
       </div>
     ) : (
       <div style={styles.answers}>
-        {lessonQuestion.answers.map((answer) => (
+        {shuffledAnswers.map((answer) => (
           <button
             key={answer}
             type="button"
+            onMouseEnter={(e) => {
+  if (selected !== answer) {
+    e.currentTarget.style.transform = "translateY(-1px)";
+    e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.08)";
+  }
+}}
+
+onMouseLeave={(e) => {
+  if (selected !== answer) {
+    e.currentTarget.style.transform = "translateY(0)";
+    e.currentTarget.style.boxShadow = "none";
+  }
+}}
             onClick={() => {
   setSelected(answer);
   setTimeout(() => {
     checkAnswer(answer);
   }, 100);
 }}
-            style={selected === answer ? styles.selectedAnswer : styles.answer}
+   style={
+  selected === answer
+    ? {
+        ...styles.selectedAnswer,
+        minHeight: 96,
+        borderRadius: 22,
+        fontSize: 28,
+        fontWeight: 900,
+        padding: "18px 20px",
+        boxShadow:
+          answerState === "correct"
+            ? "0 0 22px rgba(34,197,94,0.38)"
+            : "0 0 18px rgba(37,99,235,0.28)",
+        transform:
+          answerState === "correct"
+            ? "translateY(-1px) scale(1.03)"
+            : "translateY(-1px) scale(1.02)",
+        transition: "all 0.18s ease",
+      }
+    : {
+        ...styles.answer,
+        minHeight: 96,
+        borderRadius: 22,
+        fontSize: 28,
+        fontWeight: 900,
+        padding: "18px 20px",
+        background: "#ffffff",
+        border: "2px solid #dbeafe",
+        color: "#0f172a",
+        boxShadow: "0 6px 14px rgba(15,23,42,0.06)",
+        transition: "all 0.18s ease",
+        animation:
+          answerState === "correct"
+            ? "correctAnswerGlow 0.32s ease"
+            : "none",
+      }
+}
           >
             {answer}
           </button>
@@ -5198,31 +7330,47 @@ const indicatorProgressPercent = Math.min(
       </div>
     )}
 
-    {feedback && (
+   {feedback && (
   <div
     style={{
       ...styles.feedback,
-      borderLeft: feedback.includes("Correct") ? "6px solid #16a34a" : "6px solid #f97316",
-      background: feedback.includes("Correct") ? "#dcfce7" : "#ffedd5",
+      marginTop: 18,
+      borderRadius: 22,
+      padding: 18,
+      border: feedback.includes("Correct")
+        ? "3px solid #86efac"
+        : "3px solid #fdba74",
+      background: feedback.includes("Correct")
+        ? "linear-gradient(135deg, #dcfce7, #f0fdf4)"
+        : "linear-gradient(135deg, #ffedd5, #fff7ed)",
       color: "#0f172a",
+      boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
     }}
   >
-    <strong>
-      {feedback.includes("Correct") ? "Nice work!" : "Let’s learn from that."}
-    </strong>
+    <div
+      style={{
+        fontSize: 24,
+        fontWeight: 900,
+        marginBottom: 6,
+      }}
+    >
+      {feedback.includes("Correct") ? "✅ Nice work!" : "💡 Let’s learn from that."}
+    </div>
 
-    <p style={{ margin: "6px 0 0" }}>{feedback}</p>
+    <p style={{ margin: "6px 0 0", fontSize: 16, fontWeight: 700 }}>
+      {feedback}
+    </p>
 
     {lastMistakeType && !feedback.includes("Correct") && (
       <div
         style={{
-          marginTop: 10,
-          padding: "8px 10px",
-          borderRadius: 10,
+          marginTop: 12,
+          padding: "10px 12px",
+          borderRadius: 14,
           background: "#fff7ed",
-          border: "1px solid #fed7aa",
+          border: "2px solid #fed7aa",
           color: "#9a3412",
-          fontWeight: 800,
+          fontWeight: 900,
         }}
       >
         Mistake clue: {lastMistakeType}
@@ -5230,57 +7378,265 @@ const indicatorProgressPercent = Math.min(
     )}
 
     {!feedback.includes("Correct") && adaptationSupport?.workedExample && (
-      <p style={{ margin: "8px 0 0" }}>
+      <p style={{ margin: "10px 0 0", fontSize: 15, fontWeight: 700 }}>
         <strong>Try this idea:</strong> {adaptationSupport.workedExample}
       </p>
     )}
   </div>
 )}
+{lessonQuestion.showReadAloudText && (
+  <div
+    style={{
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 10,
+      background: "#eff6ff",
+      border: "1px solid #bfdbfe",
+      color: "#1d4ed8",
+      fontSize: 12,
+      fontWeight: 800,
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+      }}
+    >
+      <span>
+        🔊 Read aloud: {adaptationSupport?.readAloudText}
+      </span>
 
-    <div style={styles.row}>
       <button
         type="button"
-        onClick={checkAnswer}
-        disabled={
-          lessonQuestion.type === "multi-step"
-            ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
-            : !selected
-        }
+        onClick={() => {
+  speakReadAloudText(adaptationSupport?.readAloudText);
+
+  setSupportUsage((prev) => ({
+    ...prev,
+    readAloudUsed: (prev?.readAloudUsed || 0) + 1,
+  }));
+
+  setInterventionLog((prev) => [
+    ...prev,
+    {
+      student: currentStudent,
+      type: "Read Aloud Used",
+      question: lessonQuestion?.prompt || "",
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+}}
         style={{
-          ...styles.primary,
-          opacity:
-            lessonQuestion.type === "multi-step"
-              ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
-                ? 0.5
-                : 1
-              : selected
-              ? 1
-              : 0.5,
-          cursor:
-            lessonQuestion.type === "multi-step"
-              ? Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
-                ? "not-allowed"
-                : "pointer"
-              : selected
-              ? "pointer"
-              : "not-allowed",
+          background: "#2563eb",
+          color: "#ffffff",
+          border: "none",
+          borderRadius: 999,
+          padding: "6px 12px",
+          fontWeight: 800,
+          cursor: "pointer",
+          fontSize: 12,
         }}
       >
-        Auto Check
-      </button>
-
-      {feedback && hintLevel === 0 && (
-        <button type="button" onClick={nextQuestion} style={styles.secondary}>
-          Continue
-        </button>
-      )}
-
-      <button type="button" onClick={() => setScreen("today")} style={styles.secondary}>
-        Back to Today
+        ▶ Read
       </button>
     </div>
-  </Card>
+  </div>
 )}
+  
+{lessonQuestion.showWorkedExample && (
+  <details
+  onToggle={(e) => {
+    if (e.target.open) {
+      setSupportUsage((prev) => ({
+        ...prev,
+        exampleOpened: (prev?.exampleOpened || 0) + 1,
+      }));
+      setInterventionLog((prev) => [
+  ...prev,
+  {
+    student: currentStudent,
+    type: "Worked Example Opened",
+    question: lessonQuestion?.prompt || "",
+    timestamp: new Date().toISOString(),
+  },
+]);
+    }
+  }}
+  style={{
+      marginTop: 8,
+      borderRadius: 10,
+      background: "#fef3c7",
+      border: "1px solid #fde68a",
+      overflow: "hidden",
+    }}
+  >
+    <summary
+      style={{
+        cursor: "pointer",
+        padding: 10,
+        color: "#92400e",
+        fontSize: 12,
+        fontWeight: 900,
+      }}
+    >
+      ✏️ Show Example
+    </summary>
+
+    <div
+      style={{
+        padding: "0 10px 10px",
+        color: "#92400e",
+        fontSize: 12,
+        fontWeight: 800,
+      }}
+    >
+      {adaptationSupport?.workedExample}
+    </div>
+  </details>
+)}
+
+{lessonQuestion.showFormulaReminder && (
+  <details
+  onToggle={(e) => {
+    if (e.target.open) {
+  setSupportUsage((prev) => ({
+    ...prev,
+    reminderOpened: (prev?.reminderOpened || 0) + 1,
+  }));
+
+  setInterventionLog((prev) => [
+    ...prev,
+    {
+      student: currentStudent,
+      type: "Formula Reminder Opened",
+      question: lessonQuestion?.prompt || "",
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+}
+  }}
+  style={{
+      marginTop: 8,
+      borderRadius: 10,
+      background: "#ecfccb",
+      border: "1px solid #bef264",
+      overflow: "hidden",
+    }}
+  >
+    <summary
+      style={{
+        cursor: "pointer",
+        padding: 10,
+        color: "#3f6212",
+        fontSize: 12,
+        fontWeight: 900,
+      }}
+    >
+      📘 Show Reminder
+    </summary>
+
+    <div
+      style={{
+        padding: "0 10px 10px",
+        color: "#3f6212",
+        fontSize: 12,
+        fontWeight: 800,
+      }}
+    >
+      {adaptationSupport?.formulaReminder}
+    </div>
+  </details>
+)}
+ 
+    <div style={styles.row}>
+  {lessonQuestion.type === "multi-step" && (
+    <button
+      type="button"
+      onClick={checkAnswer}
+      disabled={Object.keys(multiStepAnswers).length < lessonQuestion.steps.length}
+      style={{
+        ...styles.primary,
+        opacity:
+          Object.keys(multiStepAnswers).length < lessonQuestion.steps.length ? 0.5 : 1,
+        cursor:
+          Object.keys(multiStepAnswers).length < lessonQuestion.steps.length
+            ? "not-allowed"
+            : "pointer",
+      }}
+    >
+      Check Answers
+    </button>
+  )}
+
+  {feedback && hintLevel === 0 && (
+    <div
+      style={{
+        display: "grid",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 850,
+          color: answerState === "correct" ? "#1d4ed8" : "#92400e",
+        }}
+      >
+        {answerState === "correct"
+          ? "Ready for the next question."
+          : "Review the hint, then keep going."}
+      </div>
+
+      <button
+        type="button"
+        onClick={nextQuestion}
+        style={{
+          ...styles.secondary,
+          background:
+            answerState === "correct"
+              ? "linear-gradient(135deg, #2563eb, #1d4ed8)"
+              : "#ffffff",
+          color:
+            answerState === "correct"
+              ? "#ffffff"
+              : "#0f172a",
+          border:
+            answerState === "correct"
+              ? "1px solid #1d4ed8"
+              : styles.secondary.border,
+          boxShadow:
+            answerState === "correct"
+              ? "0 12px 28px rgba(37,99,235,0.24)"
+              : "none",
+          transform:
+            answerState === "correct"
+              ? "translateY(-1px)"
+              : "translateY(0)",
+          transition: "all 0.22s ease",
+          fontWeight: 950,
+        }}
+      >
+        {answerState === "correct" ? "Continue →" : "Try Another"}
+      </button>
+    </div>
+  )}
+
+  <button type="button" onClick={() => setScreen("strand-pathway")} style={styles.secondary}>
+  Return to Pathway
+</button>
+</div>
+
+         
+        
+            
+    </div>
+</Card>
+)}
+
 {screen === "complete" && (
   <Card title="Practice Complete">
     <div style={{ textAlign: "center", padding: 20 }}>
@@ -5358,11 +7714,75 @@ const indicatorProgressPercent = Math.min(
             <Stat label="Correct" value={`${completionResult.correct}/${completionResult.attempts}`} />
             <Stat label="Status" value={completionResult.status} />
           </div>
+          {practiceSession?.roleStats && practiceQueue?.length > 0 && (
+  <div style={{ marginTop: 10, fontSize: 12 }}>
+    <strong>Question Types:</strong>
 
+    {(() => {
+      const counts = practiceQueue.reduce((acc, q) => {
+        const type = q.questionType || "mixed";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
+
+      return Object.entries(counts).map(([type, count]) => (
+        <div key={type}>
+          {type}: {count}
+        </div>
+      ));
+    })()}
+  </div>
+)}
+          {completionResult?.roleStats && (
+  <div style={{ marginTop: 10, fontSize: 12 }}>
+    <strong>Practice Breakdown:</strong>
+    {Object.entries(completionResult.roleStats).map(([key, stats]) => (
+      <div key={key}>
+        {key.toUpperCase()}: {stats.correct}/{stats.attempts}
+      </div>
+    ))}
+  </div>
+)}
+{completionResult?.supportUsage &&
+  (completionResult.supportUsage.readAloudUsed > 0 ||
+    completionResult.supportUsage.exampleOpened > 0 ||
+    completionResult.supportUsage.reminderOpened > 0) && (
+    <div
+      style={{
+        marginTop: 12,
+        padding: 12,
+        borderRadius: 12,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        fontSize: 12,
+        color: "#334155",
+      }}
+    >
+      <strong>Supports Used:</strong>
+
+      <div style={{ marginTop: 6 }}>
+        🔊 Read Aloud: {completionResult.supportUsage.readAloudUsed}
+      </div>
+
+      <div>
+        ✏️ Example Opened: {completionResult.supportUsage.exampleOpened}
+      </div>
+
+      <div>
+        📘 Reminder Opened: {completionResult.supportUsage.reminderOpened}
+      </div>
+    </div>
+  )}
           <div style={styles.recommendationBox}>
-            <strong>Next step:</strong>
-            <p>{completionResult.nextStep}</p>
-          </div>
+  <strong>Next step:</strong>
+  <p>{completionResult.nextStep}</p>
+
+  {completionResult?.supportInsight && (
+    <p style={{ marginTop: 8 }}>
+      <strong>Support note:</strong> {completionResult.supportInsight}
+    </p>
+  )}
+</div>
 
           <div style={styles.row}>
             <button type="button" onClick={() => setScreen("today")} style={styles.primary}>Back to Today</button>
@@ -5388,8 +7808,24 @@ const indicatorProgressPercent = Math.min(
     </div>
   );
 }
+function speakReadAloudText(text) {
+  if (!text || typeof window === "undefined") return;
 
-function CurriculumVisual({ question }) {
+  try {
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.error("Speech synthesis failed:", err);
+  }
+}
+function CurriculumVisual({ question, adaptations = {} }) {
   const visualType = question?.visualType || "generic";
   const label = question?.curriculumText || question?.skill || "Use the model to choose the best answer.";
 
@@ -5410,15 +7846,25 @@ function CurriculumVisual({ question }) {
       model: <TallyModel groups={[5, 5, 3]} />,
     },
     numberLine: {
-      title: "Number line / sequence model",
-      callout: "Look for the pattern in the spaces between numbers.",
-      model: <NumberLineModel values={[20, 30, 40, "?", 60]} />,
-    },
+  title: "Number line / sequence model",
+  callout: "Use the number line to help your thinking.",
+  model: (
+    <NumberLineModel
+      values={[20, 30, 40, "?", 60]}
+      adaptations={adaptations}
+    />
+  ),
+},
     pattern: {
-      title: "Pattern model",
-      callout: "Find the repeating core or the growth rule.",
-      model: <PatternModel items={["▲", "●", "▲", "●", "▲", "?"]} />,
-    },
+  title: "Pattern model",
+  callout: "Use the pattern model to help your thinking.",
+  model: (
+    <PatternModel
+      items={["▲", "●", "▲", "●", "▲", "?"]}
+      adaptations={adaptations}
+    />
+  ),
+},
     balance: {
       title: "Equality model",
       callout: "Both sides must have the same value for equality.",
@@ -5435,18 +7881,29 @@ function CurriculumVisual({ question }) {
       model: <MeasurementModel units={6} />,
     },
     geometry: {
-      title: "Shape model",
-      callout: "Sort by attributes like sides, faces, corners, and curves.",
-      model: <GeometryModel />,
-    },
+  title: "Shape model",
+  callout: "Use the shape model to help your thinking.",
+  model: (
+    <GeometryModel
+      question={question}
+      adaptations={adaptations}
+    />
+  ),
+},
     graph: {
-      title: "Data / graph model",
-      callout: "Compare bar heights to answer the question.",
-      model: <GraphModel values={[3, 5, 2]} labels={["A", "B", "C"]} />,
-    },
-  };
+  title: "Data / graph model",
+  callout: "Use the graph to help your thinking.",
+  model: (
+    <GraphModel
+      values={[3, 5, 2]}
+      labels={["A", "B", "C"]}
+      adaptations={adaptations}
+    />
+  ),
+},
+};
 
-  const config = visualConfig[visualType] || {
+const config = visualConfig[visualType] || {
     title: "Curriculum focus",
     callout: "Use the evidence in the model to decide.",
     model: <div style={styles.genericVisualModel}>Think → Model → Answer</div>,
@@ -5519,28 +7976,149 @@ function TallyModel({ groups }) {
   );
 }
 
-function NumberLineModel({ values }) {
+function NumberLineModel({
+  values,
+  adaptations = {},
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(null);
+
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [values]);
+
+  const showJumpSupport =
+    shouldShowVisualSupport(adaptations);
+
   return (
     <div style={styles.numberLineStage}>
       <div style={styles.numberLineTrack} />
+
       <div style={styles.numberLineDots}>
-        {values.map((value, index) => (
-          <div key={index} style={styles.numberLineDotGroup}>
-            <span style={value === "?" ? styles.numberBubbleMissing : styles.numberBubblePolished}>{value}</span>
-            {index < values.length - 1 && <span style={styles.numberLineJump}>+10</span>}
-          </div>
-        ))}
+        {values.map((value, index) => {
+          const isSelected = selectedIndex === index;
+
+          return (
+            <div
+              key={index}
+              style={styles.numberLineDotGroup}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIndex((currentIndex) =>
+                    currentIndex === index ? null : index
+                  )
+                }
+                style={{
+                  ...(value === "?"
+                    ? styles.numberBubbleMissing
+                    : styles.numberBubblePolished),
+
+                  transform: isSelected
+                    ? "scale(1.08)"
+                    : "scale(1)",
+
+                  boxShadow: isSelected
+                    ? "0 12px 24px rgba(37,99,235,0.18)"
+                    : "none",
+
+                  transition:
+                    "transform 0.16s ease, box-shadow 0.16s ease",
+
+                  cursor: "pointer",
+                  outline: "none",
+                  WebkitTapHighlightColor: "transparent",
+                  touchAction: "manipulation",
+                }}
+              >
+                {value}
+              </button>
+
+              {index < values.length - 1 && (
+                <span style={styles.numberLineJump}>
+                  {showJumpSupport ? "+10" : "→"}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function PatternModel({ items }) {
+function PatternModel({
+  items,
+  adaptations = {},
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(null);
+
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [items]);
+
+  const showPatternSupport =
+    shouldShowVisualSupport(adaptations);
+
   return (
     <div style={styles.patternStage}>
-      {items.map((item, index) => (
-        <span key={index} style={item === "?" ? styles.patternTokenMissing : styles.patternTokenPolished}>{item}</span>
-      ))}
+      {items.map((item, index) => {
+        const isSelected = selectedIndex === index;
+
+        return (
+          <button
+            key={index}
+            type="button"
+            onClick={() =>
+              setSelectedIndex((currentIndex) =>
+                currentIndex === index ? null : index
+              )
+            }
+            style={{
+              ...(item === "?"
+                ? styles.patternTokenMissing
+                : styles.patternTokenPolished),
+
+              transform: isSelected
+                ? "translateY(-2px) scale(1.05)"
+                : "translateY(0px) scale(1)",
+
+              boxShadow: isSelected
+                ? "0 10px 20px rgba(37,99,235,0.16)"
+                : "none",
+
+              transition:
+                "transform 0.16s ease, box-shadow 0.16s ease",
+
+              cursor: "pointer",
+              outline: "none",
+              WebkitTapHighlightColor: "transparent",
+              touchAction: "manipulation",
+            }}
+          >
+            {item}
+          </button>
+        );
+      })}
+
+      {showPatternSupport && (
+        <div
+          style={{
+            width: "100%",
+            marginTop: 10,
+            padding: "10px 12px",
+            borderRadius: 14,
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            color: "#475569",
+            fontSize: 13,
+            fontWeight: 800,
+            textAlign: "center",
+          }}
+        >
+          Look for what changes and what stays the same.
+        </div>
+      )}
     </div>
   );
 }
@@ -5579,25 +8157,272 @@ function MeasurementModel({ units }) {
     </div>
   );
 }
+function shouldShowVisualSupport(
+  adaptations = {},
+  level = "basic"
+) {
+  if (level === "basic") {
+    return (
+      adaptations?.examples ||
+      adaptations?.formulaSheet
+    );
+  }
 
-function GeometryModel() {
+  if (level === "guided") {
+    return (
+      adaptations?.examples &&
+      adaptations?.formulaSheet
+    );
+  }
+
+  return false;
+}
+
+function GeometryModel({ question, adaptations = {} }) {
+  const [selectedShape, setSelectedShape] = useState(null);
+
+  useEffect(() => {
+    setSelectedShape(null);
+  }, [question?.id, question?.prompt]);
+
+  const showShapeSupport =
+  shouldShowVisualSupport(adaptations);
+
+  const shapes = [
+    {
+      id: "square",
+      name: "Square",
+      color: "#1e3a8a",
+      info: "4 equal sides and 4 corners.",
+      shape: (
+        <div
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: 18,
+            background: "#dbeafe",
+            border: "4px solid #2563eb",
+          }}
+        />
+      ),
+    },
+    {
+      id: "triangle",
+      name: "Triangle",
+      color: "#166534",
+      info: "3 sides and 3 corners.",
+      shape: (
+        <div
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: "48px solid transparent",
+            borderRight: "48px solid transparent",
+            borderBottom: "84px solid #22c55e",
+          }}
+        />
+      ),
+    },
+    {
+      id: "circle",
+      name: "Circle",
+      color: "#92400e",
+      info: "A curved edge with no corners.",
+      shape: (
+        <div
+          style={{
+            width: 92,
+            height: 92,
+            borderRadius: "50%",
+            background: "#fde68a",
+            border: "4px solid #f59e0b",
+          }}
+        />
+      ),
+    },
+  ];
+
+  const selectedShapeInfo = shapes.find(
+    (shape) => shape.id === selectedShape
+  );
+
   return (
-    <div style={styles.shapeSortStage}>
-      <div style={styles.shapeSortColumn}><strong>Has corners</strong><span style={styles.shapeSquarePolished} /><span style={styles.shapeTrianglePolished}>△</span></div>
-      <div style={styles.shapeSortColumn}><strong>Curved</strong><span style={styles.shapeCirclePolished} /></div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 18,
+          alignItems: "stretch",
+          justifyItems: "center",
+          padding: "10px 0",
+        }}
+      >
+        {shapes.map((shape) => {
+          const isSelected = selectedShape === shape.id;
+
+          return (
+            <button
+              key={shape.id}
+              type="button"
+              onClick={() =>
+                setSelectedShape((currentShape) =>
+                  currentShape === shape.id ? null : shape.id
+                )
+              }
+              style={{
+                width: "100%",
+                minHeight: 170,
+                display: "grid",
+                justifyItems: "center",
+                alignContent: "center",
+                gap: 12,
+                borderRadius: 22,
+                border: isSelected
+                  ? "3px solid #7c3aed"
+                  : "2px solid #e2e8f0",
+                background: isSelected
+                  ? "linear-gradient(180deg, #f5f3ff 0%, #ffffff 100%)"
+                  : "#ffffff",
+                boxShadow: isSelected
+                  ? "0 14px 30px rgba(124,58,237,0.18)"
+                  : "0 8px 18px rgba(15,23,42,0.06)",
+                cursor: "pointer",
+                outline: "none",
+                WebkitTapHighlightColor: "transparent",
+                transition:
+                  "transform 0.14s ease, box-shadow 0.14s ease, border 0.14s ease",
+                transform: isSelected
+                  ? "translateY(-2px) scale(1.02)"
+                  : "translateY(0px) scale(1)",
+                willChange: "transform",
+                touchAction: "manipulation",
+              }}
+            >
+              <div
+                style={{
+                  transform: isSelected ? "scale(1.08)" : "scale(1)",
+                  transition: "transform 0.18s ease",
+                }}
+              >
+                {shape.shape}
+              </div>
+
+              <div
+                style={{
+                  fontWeight: 950,
+                  color: shape.color,
+                  fontSize: 16,
+                }}
+              >
+                {shape.name}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {showShapeSupport && selectedShapeInfo && (
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 18,
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            color: "#334155",
+            fontWeight: 850,
+            lineHeight: 1.45,
+          }}
+        >
+          <strong style={{ color: selectedShapeInfo.color }}>
+            {selectedShapeInfo.name}
+          </strong>
+
+          <div style={{ marginTop: 6 }}>
+            {selectedShapeInfo.info}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+function GraphModel({
+  values = [3, 5, 2],
+  labels = ["A", "B", "C"],
+  adaptations = {},
+}) {
+  const [selectedBar, setSelectedBar] = useState(null);
 
-function GraphModel({ values, labels }) {
+  useEffect(() => {
+    setSelectedBar(null);
+  }, [values, labels]);
+
+  const showGraphSupport =
+    shouldShowVisualSupport(adaptations);
+
   return (
     <div style={styles.graphStage}>
-      {values.map((height, index) => (
-        <div key={index} style={styles.graphColumn}>
-          <div style={{ ...styles.barGraphBarPolished, height: height * 20 }} />
-          <strong>{labels[index]}</strong>
+      {values.map((height, index) => {
+        const isSelected = selectedBar === index;
+
+        return (
+          <button
+            key={index}
+            type="button"
+            onClick={() =>
+              setSelectedBar((currentBar) =>
+                currentBar === index ? null : index
+              )
+            }
+            style={{
+              display: "grid",
+              justifyItems: "center",
+              gap: 10,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              outline: "none",
+              WebkitTapHighlightColor: "transparent",
+              touchAction: "manipulation",
+              transform: isSelected
+                ? "translateY(-2px) scale(1.03)"
+                : "translateY(0px) scale(1)",
+              transition: "transform 0.16s ease",
+            }}
+          >
+            <div
+              style={{
+                ...styles.barGraphBarPolished,
+                height: height * 20,
+                boxShadow: isSelected
+                  ? "0 12px 22px rgba(37,99,235,0.18)"
+                  : styles.barGraphBarPolished.boxShadow,
+              }}
+            />
+
+            <strong>{labels[index]}</strong>
+          </button>
+        );
+      })}
+
+      {showGraphSupport && (
+        <div
+          style={{
+            width: "100%",
+            marginTop: 12,
+            padding: "10px 12px",
+            borderRadius: 14,
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            color: "#475569",
+            fontSize: 13,
+            fontWeight: 800,
+            textAlign: "center",
+          }}
+        >
+          Compare which bars are taller or shorter.
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -5753,12 +8578,35 @@ function GroupBox({ title, helper, rows, empty, actionLabel, onAssignGroup }) {
 }
 function getAssignmentLabel(assignment) {
   if (!assignment) return "";
+
   if (assignment.status === "completed") {
-    return `🟢 Completed ${assignment.result?.accuracy ?? "—"}%`;
+    const supportUsage = assignment.result?.supportUsage;
+
+    const supportSummary = supportUsage
+      ? [
+          supportUsage.readAloudUsed > 0
+            ? `🔊 ${supportUsage.readAloudUsed}`
+            : null,
+          supportUsage.exampleOpened > 0
+            ? `✏️ ${supportUsage.exampleOpened}`
+            : null,
+          supportUsage.reminderOpened > 0
+            ? `📘 ${supportUsage.reminderOpened}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "";
+
+    return supportSummary
+      ? `🟢 Completed ${assignment.result?.accuracy ?? "—"}% • ${supportSummary}`
+      : `🟢 Completed ${assignment.result?.accuracy ?? "—"}%`;
   }
+
   if (assignment.status === "in_progress") {
     return `🔵 In progress ${assignment.type} ${assignment.target}`;
   }
+
   return `🟡 Assigned ${assignment.type} ${assignment.target}`;
 }
 

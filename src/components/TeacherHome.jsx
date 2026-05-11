@@ -8,6 +8,7 @@ export default function TeacherHome({
   workflowAssessmentRows,
   workflowPracticeRows,
   workflowFollowUpRows,
+  interventionFollowUpQueue = [],
   interventionReferralData,
   workflowTopReferralGroups,
   setCurrentStudent,
@@ -42,7 +43,7 @@ export default function TeacherHome({
       <div style={styles.statRow}>
         <Stat label="Need Support" value={workflowSupportRows.length} />
         <Stat label="Ready to Assess" value={workflowAssessmentRows.length} />
-        <Stat label="Follow-Ups Due" value={workflowFollowUpRows.length} />
+        <Stat label="Live Follow-Ups" value={interventionFollowUpQueue.length} />
         <Stat label="Referral Students" value={interventionReferralData.studentCount} />
       </div>
 
@@ -60,8 +61,8 @@ export default function TeacherHome({
         </button>
 
         <button type="button" onClick={() => setHomeView("followup")} style={sectionButton("followup")}>
-          4. Follow Up
-        </button>
+  4. Follow Up ({interventionFollowUpQueue.length})
+</button>
 
         <button type="button" onClick={() => setHomeView("referral")} style={sectionButton("referral")}>
           Referral Snapshot
@@ -251,41 +252,112 @@ export default function TeacherHome({
       )}
 
       {homeView === "followup" && (
-        <div style={styles.analyticsCard}>
-          <div style={styles.analyticsTitle}>4. Follow up</div>
-          <div style={styles.cellSubtext}>
-            Scheduled intervention checks due now.
-          </div>
+  <div style={styles.analyticsCard}>
+    <div style={styles.analyticsTitle}>4. Follow up</div>
+    <div style={styles.cellSubtext}>
+      Students who may need a quick teacher check-in before more independent work.
+    </div>
 
-          {workflowFollowUpRows.length === 0 ? (
-            <p style={styles.cellSubtext}>No follow-ups due today.</p>
-          ) : (
-            workflowFollowUpRows.map((plan) => (
-              <button
-  key={plan.id}
-  type="button"
-  onClick={() => {
-    setCurrentStudent(plan.student);
-  }}
+    {interventionFollowUpQueue.length === 0 ? (
+      <p style={styles.cellSubtext}>No intervention follow-ups needed right now.</p>
+    ) : (
+      interventionFollowUpQueue.slice(0, 5).map((row) => (
+  <div
+    key={row.student}
+    onClick={() => {
+      setCurrentStudent(row.student);
+      if (logTeacherAction) {
+  logTeacherAction({
+    student: row.student,
+    type: "Workflow → Live",
+    detail: "Intervention Follow-Up",
+  });
+}
+
+            if (showTeacherSection) {
+              showTeacherSection("teacher-section-live");
+            }
+
+            setTimeout(() => {
+              document.getElementById("teacher-section-live")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }, 50);
+          }}
+          style={{
+            ...styles.studentChip,
+            display: "block",
+            textAlign: "left",
+            border: `1px solid ${row.queueBorder}`,
+            background: row.queueColor,
+            color: row.queueText,
+            boxShadow:
+  row.queuePriority === 1
+    ? "0 0 0 2px rgba(220,38,38,0.18)"
+    : "none",
+          }}
+        >
+          <div style={{ fontWeight: 900, fontSize: 14 }}>
+  {row.student} · {row.targetOutcome}
+</div>
+
+<div
   style={{
-    ...styles.studentChip,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: 900,
   }}
 >
-  <span>
-    {plan.student} · {plan.indicator || plan.outcome}
-  </span>
+  Priority {row.queuePriority}
+</div>
 
-  <span style={{ fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
-    Start Live →
-  </span>
-</button>
-            ))
-          )}
+          <div style={{ marginTop: 4, fontSize: 12, fontWeight: 700 }}>
+            {row.followUpReason}
+          </div>
+
+          <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900 }}>
+            👉 {row.recommendedMove}
+          </div>
+          {row.supportUsage && (
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 11,
+      color: "#92400e",
+      fontWeight: 700,
+    }}
+  >
+    Supports:{" "}
+    Read Aloud {row.supportUsage.readAloudUsed || 0} •{" "}
+    Examples {row.supportUsage.exampleOpened || 0} •{" "}
+    Reminders {row.supportUsage.reminderOpened || 0}
+  </div>
+)}
+          <div style={{ marginTop: 10 }}>
+  <button
+    type="button"
+    onClick={(event) => {
+      event.stopPropagation();
+
+      if (logTeacherAction) {
+        logTeacherAction({
+          student: row.student,
+          type: "Completed Queue Student",
+          detail: `Reviewed follow-up for ${row.targetOutcome}`,
+        });
+      }
+    }}
+    style={styles.secondary}
+  >
+    Mark Reviewed
+  </button>
+</div>
         </div>
-      )}
+      ))
+    )}
+  </div>
+)}
 
       {homeView === "referral" && (
         <div style={{ ...styles.recommendationBox, marginTop: 14 }}>

@@ -1,6 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import TeacherHome from "./TeacherHome";
 import {
+  buildStudentReportSummary,
+  buildClassReportSummaryText,
+  getSuggestedNextSkill,
+  buildSmartAssignmentBundle,
+} from "../utils/reportBuilder";
+import {
   INDICATOR_CATALOG,
   OUTCOME_TITLES,
   OUTCOME_TO_SKILL,
@@ -176,46 +182,87 @@ function buildFractionTapBoxPracticeSet(outcome = "NO4", indicator = "NO4.01", c
   return questions;
 }
 
-function buildPracticeQuestionSet(outcome, activeAllQuestions, fallbackSkill = "fractions", count = 5, adaptiveLevel = "normal", targetIndicator = null, reviewIndicators = []) {
+function buildPracticeQuestionSet(
+  outcome,
+  activeAllQuestions,
+  fallbackSkill = "fractions",
+  count = 5,
+  adaptiveLevel = "normal",
+  targetIndicator = null,
+  reviewIndicators = []
+) {
   const safeIndicator = targetIndicator || `${outcome}.01`;
   const focusCount = Math.max(3, count - 2);
   const reviewCount = Math.max(0, count - focusCount);
-  const cleanReviewIndicators = [...new Set(reviewIndicators.filter((indicator) => indicator && indicator !== safeIndicator))].slice(0, reviewCount);
+  const cleanReviewIndicators = [
+    ...new Set(
+      reviewIndicators.filter(
+        (indicator) => indicator && indicator !== safeIndicator
+      )
+    ),
+  ].slice(0, reviewCount);
 
   if (outcome === "NO4") {
-    const focusQuestions = buildFractionTapBoxPracticeSet("NO4", safeIndicator, focusCount, adaptiveLevel).map((question) => ({
+    const focusQuestions = buildFractionTapBoxPracticeSet(
+      "NO4",
+      safeIndicator,
+      focusCount,
+      adaptiveLevel
+    ).map((question) => ({
       ...question,
       practiceRole: "Focus",
     }));
 
     const reviewQuestions = cleanReviewIndicators.flatMap((indicator) =>
-      buildFractionTapBoxPracticeSet("NO4", indicator, 1, "easy").map((question) => ({
-        ...question,
-        practiceRole: "Review",
-        prompt: `Review: ${question.prompt}`,
-      }))
+      buildFractionTapBoxPracticeSet("NO4", indicator, 1, "easy").map(
+        (question) => ({
+          ...question,
+          practiceRole: "Review",
+          prompt: `Review: ${question.prompt}`,
+        })
+      )
     );
 
-    return shuffleQuestions([...focusQuestions, ...reviewQuestions]).slice(0, count);
+    return shuffleQuestions([...focusQuestions, ...reviewQuestions]).slice(
+      0,
+      count
+    );
   }
 
-  const outcomeQuestions = activeAllQuestions.filter((q) => q.outcome === outcome);
+  const outcomeQuestions = activeAllQuestions.filter(
+    (q) => q.outcome === outcome
+  );
+
   const targetedQuestions = targetIndicator
     ? outcomeQuestions.filter((q) => q.indicator === targetIndicator)
     : outcomeQuestions;
+
   const reviewQuestions = cleanReviewIndicators.flatMap((indicator) =>
-    outcomeQuestions.filter((q) => q.indicator === indicator).slice(0, 1).map((question) => ({
-      ...question,
-      practiceRole: "Review",
-    }))
+    outcomeQuestions
+      .filter((q) => q.indicator === indicator)
+      .slice(0, 1)
+      .map((question) => ({
+        ...question,
+        practiceRole: "Review",
+      }))
   );
-  const focusQuestions = shuffleQuestions(targetedQuestions.length ? targetedQuestions : outcomeQuestions).slice(0, focusCount).map((question) => ({
-    ...question,
-    practiceRole: "Focus",
-  }));
+
+  const focusQuestions = shuffleQuestions(
+    targetedQuestions.length ? targetedQuestions : outcomeQuestions
+  )
+    .slice(0, focusCount)
+    .map((question) => ({
+      ...question,
+      practiceRole: "Focus",
+    }));
+
   const fallback = QUESTION_BANK[fallbackSkill] || activeAllQuestions.slice(0, count);
 
-  return shuffleQuestions([...focusQuestions, ...reviewQuestions].length ? [...focusQuestions, ...reviewQuestions] : fallback).slice(0, count);
+  return shuffleQuestions(
+    [...focusQuestions, ...reviewQuestions].length
+      ? [...focusQuestions, ...reviewQuestions]
+      : fallback
+  ).slice(0, count);
 }
 
 function buildSkillQuestionSet(skill, activeAllQuestions, count = 5, adaptiveLevel = "normal") {
@@ -1535,73 +1582,7 @@ function getReportCardComment(display) {
 
   return "Not enough evidence collected yet.";
 }
-function buildStudentReportSummary(
-  student,
-  indicatorStats,
-  assessmentStats,
-  teacherActionLog = []
-) {
-  if (!student) return "No student selected.";
 
-  const strengths = [];
-  const needs = [];
-  const nextSteps = [];
-
-  OUTCOMES.forEach((outcome) => {
-    const display = getOutcomeDisplay(
-      indicatorStats,
-      assessmentStats,
-      student,
-      outcome
-    );
-
-    const outcomeTitle = OUTCOME_TITLES[outcome] || outcome;
-
-    if (display?.assessment?.status === "Passed") {
-      strengths.push(outcomeTitle);
-      return;
-    }
-
-    if (display?.assessment?.status === "Needs Reassessment") {
-      needs.push(`${outcomeTitle} (reassessment needed)`);
-      nextSteps.push(`rebuild and reassess ${outcomeTitle}`);
-      return;
-    }
-
-    if (display?.readyForAssessment) {
-      strengths.push(`${outcomeTitle} (ready for assessment)`);
-      nextSteps.push(`assess ${outcomeTitle}`);
-      return;
-    }
-
-    if (display?.status === "Needs Support") {
-      needs.push(outcomeTitle);
-      nextSteps.push(`provide support in ${outcomeTitle}`);
-      return;
-    }
-
-    if (display?.status === "Developing") {
-      nextSteps.push(`continue practice in ${outcomeTitle}`);
-    }
-  });
-
-    const strengthText =
-    strengths.length > 0
-      ? `Strengths: ${[...new Set(strengths)].join(", ")}.`
-      : "Strengths: Beginning to build understanding.";
-
-  const needsText =
-    needs.length > 0
-      ? `Needs: ${[...new Set(needs)].join(", ")}.`
-      : "";
-
-  const nextText =
-    nextSteps.length > 0
-      ? `Next Steps: ${[...new Set(nextSteps)].slice(0, 3).join(", ")}.`
-      : "Next Steps: Continue building evidence through practice.";
-
-  return [strengthText, needsText, nextText].filter(Boolean).join(" ");
-}
 
     function getTeacherInsightLines(row) {
   if (!row) return ["No student selected yet."];
@@ -2462,6 +2443,7 @@ export default function TeacherDashboard({
   onClearAssignment,
 }) {
   const [showNextWhy, setShowNextWhy] = useState(false);
+  const [reportMode, setReportMode] = useState("draft"); // "draft" or "final"
   const [actionLocked, setActionLocked] = useState(false);
   const [lockedQueueStudent, setLockedQueueStudent] = useState(null);
   const [teacherActionLog, setTeacherActionLog] = useState(() => {
@@ -2473,6 +2455,20 @@ export default function TeacherDashboard({
     }
   });
 
+  const [editedReportComments, setEditedReportComments] = useState(() => {
+  try {
+    const saved = localStorage.getItem("editedReportComments");
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+});
+
+const editableReportComment =
+  currentStudent && editedReportComments[currentStudent] !== undefined
+    ? editedReportComments[currentStudent]
+    : "";
+
   useEffect(() => {
     try {
       localStorage.setItem("teacherActionLog", JSON.stringify(teacherActionLog));
@@ -2480,6 +2476,30 @@ export default function TeacherDashboard({
       // Prevent app crash if localStorage is unavailable
     }
   }, [teacherActionLog]);
+useEffect(() => {
+  try {
+    localStorage.setItem("editedReportComments", JSON.stringify(editedReportComments));
+  } catch {
+    // Prevent app crash if localStorage is unavailable
+  }
+}, [editedReportComments]);
+useEffect(() => {
+  if (!currentStudent) return;
+
+  setEditedReportComments((prev) => {
+    if (prev[currentStudent] !== undefined) return prev;
+
+    return {
+      ...prev,
+      [currentStudent]: buildStudentReportSummary(
+        currentStudent,
+        indicatorStats,
+        assessmentStats,
+        teacherActionLog
+      ),
+    };
+  });
+}, [currentStudent, indicatorStats, assessmentStats, teacherActionLog]);
  useEffect(() => {
   console.log(
     buildStudentReportSummary(
@@ -2544,6 +2564,212 @@ export default function TeacherDashboard({
   classTeacherAssignments
 );
   const groups = getInstructionalGroups(analytics);
+  const classReportSummaryText = buildClassReportSummaryText(
+  students,
+  classIndicatorStats,
+  classAssessmentStats,
+  teacherActionLog
+);
+function exportClassReportsPdf() {
+  
+  const escapeHtml = (value) =>
+    String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  const reportCards = students
+    .map((student) => {
+      const comment = buildStudentReportSummary(
+        student,
+        classIndicatorStats,
+        classAssessmentStats,
+        teacherActionLog
+      );
+
+      return `
+               <section class="student-report">
+                              <h2>${escapeHtml(student)}</h2>
+
+          <div class="info-grid">
+            <div><strong>Class:</strong> ${escapeHtml(selectedClass)}</div>
+            <div><strong>Subject:</strong> Math</div>
+            <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+          </div>
+
+                    <div class="comment-box">
+            <div class="box-label">Report Comment Draft</div>
+            <p>${escapeHtml(comment)}</p>
+          </div>
+
+                    <div class="checklist-box">
+            <div class="box-label">Teacher Review Before Pasting</div>
+            <div class="check-row">☐ Adjust wording for student voice / tone</div>
+            <div class="check-row">☐ Confirm evidence matches report period</div>
+            <div class="check-row">☐ Add specific example if needed</div>
+          </div>
+
+          <div class="signature-grid">
+            <div><strong>Reviewed By:</strong> ____________________</div>
+            <div><strong>Date:</strong> ____________________</div>
+          </div>
+
+          <div class="footer-note">
+            Teacher note: Use this as draft evidence-based wording and adjust as needed before final report cards.
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    alert("Pop-up blocked. Allow pop-ups, then try again.");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Class Math Report Comments</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 24px;
+            color: #0f172a;
+            background: white;
+          }
+
+          h1 {
+            font-size: 24px;
+            margin-bottom: 4px;
+          }
+
+          .subtitle {
+            color: #64748b;
+            margin-bottom: 24px;
+            font-size: 13px;
+          }
+
+                    .student-report {
+            border: 2px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 22px;
+            margin-bottom: 18px;
+            page-break-after: always;
+            page-break-inside: avoid;
+            min-height: 90vh;
+            box-sizing: border-box;
+          }
+
+          .student-report:last-child {
+            page-break-after: auto;
+          }
+
+          .student-report h2 {
+            font-size: 18px;
+            margin: 0 0 10px 0;
+          }
+
+          .student-report p {
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+          }
+
+                    .comment-box {
+            border: 2px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 16px;
+            background: #f8fafc;
+            margin-top: 14px;
+          }
+
+          .box-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+
+                    .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 14px 0;
+          }
+
+          .info-grid div {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px;
+            background: #ffffff;
+            font-size: 12px;
+          }
+
+                    .checklist-box {
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 14px;
+            background: #ffffff;
+            margin-top: 14px;
+          }
+
+          .check-row {
+            font-size: 12px;
+            margin-top: 8px;
+            color: #334155;
+          }
+
+                    .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 18px;
+          }
+
+          .signature-grid div {
+            border-top: 1px solid #94a3b8;
+            padding-top: 8px;
+            font-size: 12px;
+            color: #334155;
+          }
+
+                    .footer-note {
+            margin-top: 28px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 11px;
+            color: #64748b;
+          }
+
+          @media print {
+            .student-report {
+              page-break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+      <body>
+                <h1>Class Math Report Drafts</h1>
+        <div class="subtitle">
+          Class ${escapeHtml(selectedClass)} · Math · ${new Date().toLocaleDateString()}
+        </div>
+        ${reportCards}
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
   const groupSummaryText = `
 Reteach: ${groups.reteach.length}
 Assessment Ready: ${groups.assessmentReady.length}
@@ -3143,7 +3369,86 @@ const recommendedLiveAction =
     .filter(([key]) => key.startsWith(`${currentStudent}-`))
     .map(([key, data]) => ({ indicator: key.replace(`${currentStudent}-`, ""), ...data }))
     .sort((a, b) => a.indicator.localeCompare(b.indicator));
+const weakestSkill =
+  selectedIndicators?.length > 0
+    ? [...selectedIndicators]
+        .filter((item) => (item.attempts ?? 0) > 0)
+        .sort((a, b) => {
+          const accuracyA = a.accuracy ?? 0;
+          const accuracyB = b.accuracy ?? 0;
 
+          if (accuracyA !== accuracyB) return accuracyA - accuracyB;
+
+          return (b.attempts ?? 0) - (a.attempts ?? 0);
+        })[0]
+    : null;
+
+const smartBundle = buildSmartAssignmentBundle({
+  weakestSkill,
+  allIndicators: selectedIndicators,
+});
+const smartBundleQuestions =
+  currentStudent && weakestSkill
+    ? buildPracticeQuestionSet(
+        "NO4",
+        activeAllQuestions,
+        "fractions",
+        5,
+        "normal",
+        weakestSkill.indicator,
+        smartBundle
+          .filter((item) => item.type === "support" || item.type === "review")
+          .map((item) => item.indicator)
+      )
+    : [];
+    const completedRoleStats = selectedSummary?.assignment?.result?.roleStats || null;
+
+const roleBasedNextStep = completedRoleStats
+  ? (() => {
+      const focus = completedRoleStats.focus;
+      const support = completedRoleStats.support;
+      const review = completedRoleStats.review;
+
+      const getAccuracy = (row) =>
+        row?.attempts > 0 ? Math.round((row.correct / row.attempts) * 100) : null;
+
+      const focusAccuracy = getAccuracy(focus);
+      const supportAccuracy = getAccuracy(support);
+      const reviewAccuracy = getAccuracy(review);
+
+      if (focusAccuracy !== null && focusAccuracy < 80) {
+        return "Continue with the focus skill using visual models and guided practice before moving on.";
+      }
+
+      if (supportAccuracy !== null && supportAccuracy < 80) {
+        return "Review the supporting skill to strengthen the foundation before extending the concept.";
+      }
+
+      if (reviewAccuracy !== null && reviewAccuracy < 80) {
+        return "Use short mixed review to maintain earlier learning while continuing the current skill.";
+      }
+
+      return "Move to a slightly more challenging version of this skill with explanation and real-world problems.";
+    })()
+  : null;
+const roleReportEvidenceSentence = completedRoleStats
+  ? (() => {
+      const formatRole = (label, row) => {
+        if (!row?.attempts) return null;
+        return `${label}: ${row.correct}/${row.attempts}`;
+      };
+
+      const parts = [
+        formatRole("focus", completedRoleStats.focus),
+        formatRole("support", completedRoleStats.support),
+        formatRole("review", completedRoleStats.review),
+      ].filter(Boolean);
+
+      return parts.length > 0
+        ? `Recent practice evidence shows ${parts.join(", ")}.`
+        : "";
+    })()
+  : "";
   const [referralEmail, setReferralEmail] = useState("resource.teacher@example.com");
   const [referralThreshold, setReferralThreshold] = useState(60);
   const [interventionType, setInterventionType] = useState("Small Group");
@@ -3567,12 +3872,14 @@ const [liveActionMessage, setLiveActionMessage] = useState("");
   setCurrentStudent(student);
 
   onAssignGroupPractice([
-    {
-      ...liveRow,
-      student,
-      groupFocus: safeOutcome,
-    },
-  ]);
+  {
+    ...liveRow,
+    student,
+    groupFocus: safeOutcome,
+    customQuestions: options.customQuestions || null,
+    customBundle: options.customBundle || null,
+  },
+]);
 
   recordLiveAction(`Assigned practice to ${student}${safeOutcome ? ` for ${safeOutcome}` : ""}.`);
 
@@ -3909,6 +4216,32 @@ function StatusPill({ status }) {
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 800 }}>
               Evidence: {selectedSummary?.supportCount || 0} support flag(s) · {selectedSummary?.alerts || 0} alert(s)
             </div>
+            {selectedSummary?.assignment?.result?.roleStats && (
+  <div
+    style={{
+      marginTop: 10,
+      padding: 10,
+      borderRadius: 12,
+      background: "#f1f5f9",
+      border: "1px solid #e2e8f0",
+      fontSize: 12,
+      fontWeight: 800,
+      color: "#334155",
+    }}
+  >
+    <div style={{ marginBottom: 4, color: "#475569" }}>
+      Practice Breakdown
+    </div>
+
+    {Object.entries(selectedSummary.assignment.result.roleStats).map(
+      ([key, stats]) => (
+        <div key={key}>
+          {key.toUpperCase()}: {stats.correct}/{stats.attempts}
+        </div>
+      )
+    )}
+  </div>
+)}
 
             {liveActionMessage && (
               <div
@@ -5057,58 +5390,24 @@ boxShadow: row.student === currentStudent ? "0 0 0 3px rgba(220, 38, 38, 0.16)" 
 >
   Copy Groups
 </button>
+<button
+  type="button"
+  onClick={() => {
+    navigator.clipboard.writeText(classReportSummaryText.trim());
+    alert("All report comments copied.");
+  }}
+  style={styles.gridActionButton}
+>
+  Copy All Report Comments
+</button>
 
-{/* ===== REPORT CARD PANEL ===== */}
-<div style={{ marginTop: 16, width: "100%" }}>
-  <Card title="Report Card Summary">
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      
-      <div style={{ fontWeight: 800, color: "#334155" }}>
-        {currentStudent || "No student selected"}
-      </div>
-
-      <div
-        style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: 10,
-          padding: 12,
-          fontSize: 13,
-          lineHeight: 1.5,
-          color: "#1e293b",
-        }}
-      >
-        {currentStudent
-          ? buildStudentReportSummary(
-              currentStudent,
-              indicatorStats,
-              assessmentStats,
-              teacherActionLog
-            )
-          : "Select a student to generate a report summary."}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          if (!currentStudent) return;
-          const text = buildStudentReportSummary(
-            currentStudent,
-            indicatorStats,
-            assessmentStats,
-            teacherActionLog
-          );
-          navigator.clipboard.writeText(text);
-          alert("Report comment copied.");
-        }}
-        style={styles.gridActionButton}
-      >
-        Copy Report Comment
-      </button>
-
-    </div>
-  </Card>
-</div>
+<button
+  type="button"
+  onClick={exportClassReportsPdf}
+  style={styles.gridActionButton}
+>
+  Export Class PDF
+</button>
 
 <button
   type="button"
@@ -6759,50 +7058,284 @@ background: actionColor,
           </div>
         </Card>
         {/* ===== REPORT CARD PANEL ===== */}
-<Card title="Report Card Summary">
+<style>
+  {`
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      .print-report-card,
+      .print-report-card * {
+        visibility: visible;
+      }
+
+      .print-report-card {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+        background: white;
+      }
+
+      .print-report-card button {
+        display: none !important;
+      }
+    }
+  `}
+</style>
+<Card title="Report Card Summary" className="print-report-card">
+  <div style={{ marginBottom: 10 }}>
+  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+    Student Report
+  </div>
+
+  <div style={{ fontSize: 13, color: "#475569", marginTop: 4 }}>
+    {currentStudent ? `Student: ${currentStudent}` : "No student selected"}
+  </div>
+
+  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+    {new Date().toLocaleDateString()}
+  </div>
+</div>
   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
     
     <div style={{ fontWeight: 800, color: "#334155" }}>
       {currentStudent || "No student selected"}
     </div>
 
+      {/* Generated Comment */}
+<div
+
+  style={{
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "#475569",
+  }}
+>
+  {currentStudent
+  ? `${buildStudentReportSummary(
+      currentStudent,
+      indicatorStats,
+      assessmentStats,
+      teacherActionLog
+    )}${roleReportEvidenceSentence ? ` ${roleReportEvidenceSentence}` : ""}`
+  : "Select a student to generate a report summary."}
+</div>
+
+{/* Suggested Next Skill */}
+<div
+  style={{
+    background: "#ecfeff",
+    border: "1px solid #67e8f9",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "#0f172a",
+    fontWeight: 800,
+    marginTop: 10,
+  }}
+>
+  <div style={{ fontSize: 11, color: "#0891b2", marginBottom: 4 }}>
+    Suggested Next Skill
+  </div>
+
+  {currentStudent && weakestSkill
+  ? roleBasedNextStep ||
+    getSuggestedNextSkill(
+      weakestSkill.indicator || "",
+      weakestSkill.status || "Developing"
+    )
+  : "Select a student with recorded indicator data to see next-step guidance."}
+
+  {currentStudent && weakestSkill ? (
     <div
       style={{
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: 10,
-        padding: 12,
-        fontSize: 13,
-        lineHeight: 1.5,
-        color: "#1e293b",
+        marginTop: 6,
+        fontSize: 11,
+        color: "#475569",
+        fontWeight: 700,
       }}
     >
-      {currentStudent
-        ? buildStudentReportSummary(
-            currentStudent,
-            indicatorStats,
-            assessmentStats,
-            teacherActionLog
-          )
-        : "Select a student to generate a report summary."}
+      Based on: {weakestSkill.indicator} · {weakestSkill.accuracy}% accuracy ·{" "}
+      {weakestSkill.attempts} attempt{weakestSkill.attempts === 1 ? "" : "s"}
     </div>
+  ) : null}
+</div>
+
+{/* Suggested Practice Bundle */}
+<div
+  style={{
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+  }}
+>
+  <div style={{ fontSize: 11, fontWeight: 900, color: "#475569" }}>
+    Suggested Practice Bundle
+  </div>
+
+  {smartBundle?.length === 0 ? (
+    <div style={{ fontSize: 12, marginTop: 6 }}>
+      No bundle available yet.
+    </div>
+  ) : (
+    smartBundle?.map((item, i) => (
+      <div
+        key={i}
+        style={{
+          fontSize: 12,
+          marginTop: 6,
+          fontWeight: 700,
+          color: "#334155",
+        }}
+      >
+        {item.type.toUpperCase()}: {item.indicator}
+      </div>
+    ))
+  )}
+    {smartBundleQuestions?.length > 0 ? (
+    <div
+      style={{
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: "1px solid #e2e8f0",
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 900, color: "#475569" }}>
+        Question Preview
+      </div>
+
+      {smartBundleQuestions.slice(0, 5).map((question, index) => (
+        <div
+          key={question.id || index}
+          style={{
+            marginTop: 6,
+            fontSize: 12,
+            color: "#334155",
+            fontWeight: 700,
+          }}
+        >
+          {index + 1}. {question.practiceRole || "Practice"} — {question.prompt}
+        </div>
+      ))}
+    </div>
+  ) : null}
+
+<button
+  type="button"
+  onClick={() => {
+  if (!currentStudent || smartBundleQuestions?.length === 0) return;
+
+  assignLivePractice(currentStudent, "NO4", {
+  advanceGroup: false,
+  customQuestions: smartBundleQuestions,
+  customBundle: smartBundle,
+});
+
+  logTeacherAction({
+    student: currentStudent,
+    type: "Assigned Practice",
+    detail: `Assigned suggested fraction smart bundle (${smartBundleQuestions.length} questions): ${smartBundle
+  .map((item) => `${item.type}: ${item.indicator}`)
+  .join(", ")}.`,
+  });
+
+  console.log("Assigned suggested bundle preview:", smartBundleQuestions);
+}}
+  style={{
+    marginTop: 10,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "1px solid #0ea5e9",
+    background: "#e0f2fe",
+    color: "#0369a1",
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: "pointer",
+  }}
+>
+  Assign Suggested Bundle
+</button>
+
+</div>
+
+{/* Editable Comment */}
+<textarea
+  value={editableReportComment}
+  onChange={(e) => {
+  const value = e.target.value;
+
+  if (!currentStudent) return;
+
+  setEditedReportComments((prev) => ({
+    ...prev,
+    [currentStudent]: value,
+  }));
+}}
+  style={{
+    marginTop: 12,
+    width: "100%",
+    minHeight: 140,
+    borderRadius: 12,
+    border: "2px solid #cbd5e1",
+    padding: 12,
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: "#1e293b",
+    resize: "vertical",
+    fontFamily: "inherit",
+  }}
+/>
+
+    <button
+  type="button"
+  onClick={() => {
+    if (!currentStudent) return;
+    const text = editableReportComment;
+    navigator.clipboard.writeText(text);
+    alert("Report comment copied.");
+  }}
+  style={styles.gridActionButton}
+>
+           Copy Report Comment
+    </button>
 
     <button
       type="button"
       onClick={() => {
-        if (!currentStudent) return;
-        const text = buildStudentReportSummary(
-          currentStudent,
-          indicatorStats,
-          assessmentStats,
-          teacherActionLog
-        );
-        navigator.clipboard.writeText(text);
-        alert("Report comment copied.");
+        navigator.clipboard.writeText(classReportSummaryText.trim());
+        alert("All report comments copied.");
       }}
       style={styles.gridActionButton}
     >
-      Copy Report Comment
+      Copy All Report Comments
+    </button>
+
+    <button
+      type="button"
+      onClick={exportClassReportsPdf}
+      style={styles.gridActionButton}
+    >
+      Export Class PDF
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        window.print();
+      }}
+      style={styles.gridActionButton}
+    >
+      Export / Print PDF
     </button>
 
   </div>

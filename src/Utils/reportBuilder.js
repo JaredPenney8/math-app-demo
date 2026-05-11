@@ -185,21 +185,48 @@ export function getProgressionArea(outcomeTitle) {
 export function buildSmartAssignmentBundle({
   weakestSkill,
   allIndicators = [],
+  roleStats = null,
 }) {
   if (!weakestSkill) return [];
 
+  const getAccuracy = (row) =>
+    row?.attempts > 0 ? Math.round((row.correct / row.attempts) * 100) : null;
+
+  const focusAccuracy = getAccuracy(roleStats?.focus);
+  const supportAccuracy = getAccuracy(roleStats?.support);
+  const reviewAccuracy = getAccuracy(roleStats?.review);
+
   const focus = weakestSkill;
 
-  const supporting = allIndicators
+  const supportCandidates = allIndicators
     .slice()
     .filter((item) => item.indicator !== focus.indicator)
     .filter((item) => (item.accuracy ?? 0) >= (focus.accuracy ?? 0))
-    .sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0))[0];
+    .sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0));
 
-  const review = allIndicators
+  const reviewCandidates = allIndicators
     .slice()
+    .filter((item) => item.indicator !== focus.indicator)
     .filter((item) => (item.accuracy ?? 0) >= 80)
-    .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))[0];
+    .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
+
+  let supporting = supportCandidates[0];
+  let review = reviewCandidates[0];
+
+  if (roleStats) {
+    if (focusAccuracy !== null && focusAccuracy < 80) {
+      supporting = supportCandidates[0] || null;
+      review = reviewCandidates[0] || null;
+    }
+
+    if (supportAccuracy !== null && supportAccuracy < 80) {
+      supporting = supportCandidates[0] || supporting;
+    }
+
+    if (reviewAccuracy !== null && reviewAccuracy < 80) {
+      review = reviewCandidates[1] || reviewCandidates[0] || null;
+    }
+  }
 
   return [
     {
@@ -251,7 +278,8 @@ export function buildStudentReportSummary(
   student,
   indicatorStats,
   assessmentStats,
-  teacherActionLog = []
+  teacherActionLog = [],
+  supportUsage = null
 ) {
   if (!student) return "No student selected.";
 
@@ -303,6 +331,7 @@ export function buildStudentReportSummary(
   const needs = [];
   const nextSteps = [];
   const evidence = [];
+    const supportEvidence = [];
 
   let passedCount = 0;
   let readyCount = 0;
@@ -394,6 +423,18 @@ export function buildStudentReportSummary(
     needs.push("adapted supports");
   }
 
+    if (supportUsage?.readAloudUsed > 0) {
+    supportEvidence.push("read-aloud support");
+  }
+
+  if (supportUsage?.exampleOpened > 0) {
+    supportEvidence.push("worked examples");
+  }
+
+  if (supportUsage?.reminderOpened > 0) {
+    supportEvidence.push("strategy reminders");
+  }
+  
   const studentIndicatorEntries = Object.entries(indicatorStats || {}).filter(
     ([key, data]) =>
       key.startsWith(`${student}-`) &&
@@ -451,15 +492,22 @@ export function buildStudentReportSummary(
       : "";
 
   const evidenceSentence =
-    studentActionCount > 0
-      ? `This is based on ${studentActionCount} recorded learning interaction${
-          studentActionCount === 1 ? "" : "s"
-        }${evidence.length > 0 ? `, including ${formatList(evidence)}` : ""}.`
-      : overallAccuracy !== null && totalAttempts >= 3
-      ? `Recent work shows ${overallAccuracy}% accuracy across ${totalAttempts} attempt${
-          totalAttempts === 1 ? "" : "s"
-        }.`
-      : "";
+  studentActionCount > 0
+    ? `This is based on ${studentActionCount} recorded learning interaction${
+        studentActionCount === 1 ? "" : "s"
+      }${
+        evidence.length > 0 || supportEvidence.length > 0
+          ? `, including ${formatList([
+              ...evidence,
+              ...supportEvidence,
+            ])}`
+          : ""
+      }.`
+    : overallAccuracy !== null && totalAttempts >= 3
+    ? `Recent work shows ${overallAccuracy}% accuracy across ${totalAttempts} attempt${
+        totalAttempts === 1 ? "" : "s"
+      }.`
+    : "";
 
   let progressSentence = "";
 

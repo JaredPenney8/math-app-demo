@@ -189,18 +189,45 @@ function buildPracticeQuestionSet(
   count = 5,
   adaptiveLevel = "normal",
   targetIndicator = null,
-  reviewIndicators = []
+  reviewIndicators = [],
+  adaptiveQuestionType = "mixed",
+adaptiveRepresentation = "standardVisual"
 ) {
   const safeIndicator = targetIndicator || `${outcome}.01`;
-  const focusCount = Math.max(3, count - 2);
-  const reviewCount = Math.max(0, count - focusCount);
-  const cleanReviewIndicators = [
-    ...new Set(
-      reviewIndicators.filter(
-        (indicator) => indicator && indicator !== safeIndicator
-      )
-    ),
-  ].slice(0, reviewCount);
+  const focusCount =
+  adaptiveQuestionType === "visual"
+    ? Math.max(4, count - 1)
+    : adaptiveQuestionType === "challenge"
+    ? Math.max(2, count - 3)
+    : Math.max(3, count - 2);
+
+const reviewCount = Math.max(0, count - focusCount);
+const buildAdaptivePrompt = (question, roleLabel = "") => {
+  const basePrompt =
+    adaptiveRepresentation === "concreteVisual"
+      ? `Use the model to help: ${question.prompt}`
+      : adaptiveRepresentation === "guidedVisual"
+      ? `Look carefully at the visual model: ${question.prompt}`
+      : adaptiveRepresentation === "wordProblem"
+      ? `Solve the problem and explain your thinking: ${question.prompt}`
+      : question.prompt;
+
+  return roleLabel
+    ? `${roleLabel} (${adaptiveQuestionType}): ${basePrompt}`
+    : basePrompt;
+};
+  const cleanReviewIndicators = reviewIndicators
+  .map((item) =>
+    typeof item === "string"
+      ? { type: "review", indicator: item }
+      : item
+  )
+  .filter((item) => item?.indicator && item.indicator !== safeIndicator)
+  .filter(
+    (item, index, array) =>
+      array.findIndex((other) => other.indicator === item.indicator) === index
+  )
+  .slice(0, reviewCount);
 
   if (outcome === "NO4") {
     const focusQuestions = buildFractionTapBoxPracticeSet(
@@ -209,19 +236,27 @@ function buildPracticeQuestionSet(
       focusCount,
       adaptiveLevel
     ).map((question) => ({
-      ...question,
-      practiceRole: "Focus",
-    }));
+  ...question,
+  practiceRole: "Focus",
+  questionType: adaptiveQuestionType,
+  representation: adaptiveRepresentation,
+  prompt: buildAdaptivePrompt(question, "Focus"),
+}));
 
-    const reviewQuestions = cleanReviewIndicators.flatMap((indicator) =>
-      buildFractionTapBoxPracticeSet("NO4", indicator, 1, "easy").map(
-        (question) => ({
-          ...question,
-          practiceRole: "Review",
-          prompt: `Review: ${question.prompt}`,
-        })
-      )
-    );
+    const reviewQuestions = cleanReviewIndicators.flatMap((item) =>
+  buildFractionTapBoxPracticeSet("NO4", item.indicator, 1, "easy").map(
+    (question) => ({
+      ...question,
+      practiceRole: item.type === "support" ? "Support" : "Review",
+      questionType: adaptiveQuestionType,
+      representation: adaptiveRepresentation,
+      prompt: buildAdaptivePrompt(
+        question,
+        item.type === "support" ? "Support" : "Review"
+      ),
+    })
+  )
+);
 
     return shuffleQuestions([...focusQuestions, ...reviewQuestions]).slice(
       0,
@@ -237,24 +272,37 @@ function buildPracticeQuestionSet(
     ? outcomeQuestions.filter((q) => q.indicator === targetIndicator)
     : outcomeQuestions;
 
-  const reviewQuestions = cleanReviewIndicators.flatMap((indicator) =>
-    outcomeQuestions
-      .filter((q) => q.indicator === indicator)
-      .slice(0, 1)
-      .map((question) => ({
-        ...question,
-        practiceRole: "Review",
-      }))
-  );
-
-  const focusQuestions = shuffleQuestions(
-    targetedQuestions.length ? targetedQuestions : outcomeQuestions
-  )
-    .slice(0, focusCount)
+  const reviewQuestions = cleanReviewIndicators.flatMap((item) =>
+  outcomeQuestions
+    .filter((q) => q.indicator === item.indicator)
+    .slice(0, 1)
     .map((question) => ({
       ...question,
-      practiceRole: "Focus",
-    }));
+      practiceRole: item.type === "support" ? "Support" : "Review",
+questionType: adaptiveQuestionType,
+representation: adaptiveRepresentation,
+prompt:
+  adaptiveRepresentation === "concreteVisual"
+    ? `Use the model to help: ${question.prompt}`
+    : adaptiveRepresentation === "guidedVisual"
+    ? `Look carefully at the visual model: ${question.prompt}`
+    : adaptiveRepresentation === "wordProblem"
+    ? `Solve the problem and explain your thinking: ${question.prompt}`
+    : question.prompt,
+    }))
+);
+
+  const focusQuestions = shuffleQuestions(
+  targetedQuestions.length ? targetedQuestions : outcomeQuestions
+)
+  .slice(0, focusCount)
+  .map((question) => ({
+    ...question,
+    practiceRole: "Focus",
+    questionType: adaptiveQuestionType,
+    representation: adaptiveRepresentation,
+    prompt: buildAdaptivePrompt(question, "Focus"),
+  }));
 
   const fallback = QUESTION_BANK[fallbackSkill] || activeAllQuestions.slice(0, count);
 
@@ -973,6 +1021,134 @@ const QUESTION_BANK = {
       hint: "Equivalent fractions name the same amount. Try multiplying the top and bottom by the same number.",
       hint2: "3/4 × 2/2 = 6/8, so 6/8 names the same amount as 3/4.",
     },
+        {
+      prompt: "Which picture would show 1/2?",
+      difficulty: "easy",
+      answers: [
+        "1 shaded part out of 2 equal parts",
+        "1 shaded part out of 3 equal parts",
+        "2 shaded parts out of 3 equal parts",
+      ],
+      correct: "1 shaded part out of 2 equal parts",
+      outcome: "NO4",
+      indicator: "NO4.01",
+      skill: "Fraction visual model",
+      questionType: "visual",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Confusing half with any one shaded part",
+      hint: "Half means the whole is split into 2 equal parts.",
+      hint2: "1/2 means 1 part is shaded out of 2 equal parts.",
+    },
+    {
+      prompt: "A rectangle is split into 4 equal parts. 1 part is shaded. What fraction is shaded?",
+      difficulty: "easy",
+      answers: ["1/4", "2/4", "4/1"],
+      correct: "1/4",
+      tapBoxModel: {
+        total: 4,
+        target: 1,
+      },
+      outcome: "NO4",
+      indicator: "NO4.01",
+      skill: "Fraction visual model",
+      questionType: "visual",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Reversing shaded parts and total parts",
+      hint: "The top number is the shaded parts.",
+      hint2: "There is 1 shaded part out of 4 equal parts, so the fraction is 1/4.",
+    },
+    {
+      prompt: "Which fraction means 2 shaded parts out of 3 equal parts?",
+      difficulty: "easy",
+      answers: ["2/3", "3/2", "1/3"],
+      correct: "2/3",
+      outcome: "NO4",
+      indicator: "NO4.02",
+      skill: "Fraction symbols",
+      questionType: "multiple choice",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Reversing numerator and denominator",
+      hint: "The shaded parts go on top. The total equal parts go on bottom.",
+      hint2: "2 shaded parts out of 3 equal parts is 2/3.",
+    },
+    {
+      prompt: "Which one is NOT a fair fraction model?",
+      difficulty: "normal",
+      answers: [
+        "A shape split into 4 equal parts",
+        "A shape split into 3 equal parts",
+        "A shape split into unequal parts",
+      ],
+      correct: "A shape split into unequal parts",
+      outcome: "NO4",
+      indicator: "NO4.01",
+      skill: "Equal parts",
+      questionType: "error analysis",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Not noticing that fraction parts must be equal",
+      hint: "Fractions need equal parts.",
+      hint2: "If the parts are unequal, the model does not show a fair fraction.",
+    },
+    {
+      prompt: "Maya says 3/4 means 4 shaded parts out of 3 total parts. What is her mistake?",
+      difficulty: "normal",
+      answers: [
+        "She switched the numerator and denominator",
+        "She counted the shaded parts correctly",
+        "She made the parts equal",
+      ],
+      correct: "She switched the numerator and denominator",
+      outcome: "NO4",
+      indicator: "NO4.02",
+      skill: "Fraction symbols",
+      questionType: "error analysis",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Misunderstanding numerator and denominator roles",
+      hint: "Look at what the top and bottom numbers mean.",
+      hint2: "In 3/4, 3 is the shaded or selected parts. 4 is the total equal parts.",
+    },
+    {
+      prompt: "Four friends share one sandwich equally. Each friend gets what fraction?",
+      difficulty: "normal",
+      answers: ["1/4", "1/2", "4/1"],
+      correct: "1/4",
+      outcome: "NO4",
+      indicator: "NO4.02",
+      skill: "Real-world fractions",
+      questionType: "word problem",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Using number of people as the numerator instead of the denominator",
+      hint: "One sandwich is the whole. It is shared by 4 people.",
+      hint2: "Each person gets 1 part out of 4 equal parts, so each gets 1/4.",
+    },
+    {
+      prompt: "Which fraction is equal to one whole?",
+      difficulty: "normal",
+      answers: ["4/4", "3/4", "1/4"],
+      correct: "4/4",
+      outcome: "NO4",
+      indicator: "NO4.03",
+      skill: "Whole fractions",
+      questionType: "multiple choice",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Not recognizing that all equal parts make one whole",
+      hint: "A whole means all parts are selected.",
+      hint2: "4/4 means 4 out of 4 equal parts, so that is one whole.",
+    },
+    {
+      prompt: "Challenge: Which is larger, 1/2 or 1/4?",
+      difficulty: "challenge",
+      answers: ["1/2", "1/4", "They are equal"],
+      correct: "1/2",
+      outcome: "NO4",
+      indicator: "NO4.03",
+      skill: "Compare fractions visually",
+      questionType: "comparison",
+      visualType: "fraction_model",
+      mistakeIfWrong: "Thinking larger denominator always means larger fraction",
+      hint: "Think about cutting the same whole into 2 parts or 4 parts.",
+      hint2: "One half is larger than one fourth because halves are bigger pieces than fourths.",
+    },
   ],
   decimals: [
     {
@@ -1085,6 +1261,11 @@ const DEFAULT_STUDENT_STATE = {
   outcomeStats: {},
   indicatorStats: {},
   completionResult: null,
+    supportUsage: {
+    readAloudUsed: 0,
+    exampleOpened: 0,
+    reminderOpened: 0,
+  },
   questionEdits: {},
   interventionLog: [],
   interventionPlans: [],
@@ -1594,6 +1775,13 @@ function getReportCardComment(display) {
     lines.push(
       `Completed ${activeAssignment.type} ${activeAssignment.target} with ${activeAssignment.result?.accuracy ?? "—"}% accuracy.`
     );
+   if (activeAssignment?.result?.supportInsight) {
+  lines.push(activeAssignment.result.supportInsight);
+
+  if (activeAssignment.result.supportInsight.includes("High support use")) {
+    lines.push("Recommended move: pull for a quick check-in before assigning more independent work.");
+  }
+}
   } else if (activeAssignment) {
     lines.push(`Has assigned ${activeAssignment.type.toLowerCase()} for ${activeAssignment.target}.`);
   }
@@ -1633,7 +1821,144 @@ function getReportCardComment(display) {
 
   return lines.slice(0, 3);
 }
+function getInterventionFollowUpQueue({
+  students = [],
+  teacherAssignments = {},
+  interventionLog = [],
+  assessmentStats = {},
+  alerts = [],
+  teacherActionLog = [],
+}) {
+  const rows = [];
+const recentlyHandledStudents = teacherActionLog
+  .filter((entry) =>
+    [
+      "Completed Queue Student",
+      "Mini Lesson",
+      "Assigned Practice",
+      "Assigned Assessment",
+    ].includes(entry.type)
+  )
+  .map((entry) => entry.student);
 
+  students.forEach((student) => {
+    const assignment = teacherAssignments?.[student] || null;
+    const result = assignment?.result || null;
+    const supportInsight = result?.supportInsight || "";
+    const supportUsage = result?.supportUsage || null;
+
+    const studentInterventions = (interventionLog || [])
+  .filter((entry) => entry?.student === student)
+  .slice(-10);
+
+    const studentAlerts = (alerts || []).filter(
+      (alert) => alert?.student === student
+    );
+
+    const totalSupportUses =
+      (supportUsage?.readAloudUsed || 0) +
+      (supportUsage?.exampleOpened || 0) +
+      (supportUsage?.reminderOpened || 0);
+
+    const needsSupportEntry = studentInterventions.find(
+      (entry) =>
+        entry?.type === "Needs Support" ||
+        entry?.status === "Teacher Follow-Up Recommended"
+    );
+
+    const needsFollowUpEntry = studentInterventions.find(
+      (entry) =>
+        entry?.type === "Practice Completed" &&
+        entry?.status === "Needs Follow-Up"
+    );
+
+    const failedAssessment = Object.entries(assessmentStats || {}).find(
+      ([key, entry]) =>
+        key.startsWith(`${student}-`) &&
+        entry?.status === "Needs Reassessment"
+    );
+
+    let queuePriority = null;
+    let followUpReason = "";
+    let recommendedMove = "";
+    let targetOutcome =
+      result?.target ||
+      assignment?.target ||
+      needsSupportEntry?.target ||
+      needsFollowUpEntry?.target ||
+      "Current skill";
+
+    if (supportInsight.includes("High support use") || totalSupportUses >= 5) {
+      queuePriority = 1;
+      followUpReason =
+        supportInsight || "High support use during recent practice.";
+
+      recommendedMove =
+        "Pull for a quick check-in before assigning more independent work.";
+    } else if (needsFollowUpEntry) {
+      queuePriority = 2;
+
+      followUpReason =
+        needsFollowUpEntry?.note ||
+        "Recent practice was marked Needs Follow-Up.";
+
+      recommendedMove =
+        "Review the missed skill, then assign a short targeted practice cycle.";
+    } else if (failedAssessment) {
+      queuePriority = 3;
+
+      followUpReason =
+        "Assessment result shows Needs Reassessment.";
+
+      recommendedMove =
+        "Reteach the outcome briefly before assigning another assessment.";
+    } else if (studentAlerts.length >= 2) {
+      queuePriority = 4;
+
+      followUpReason =
+        `${studentAlerts.length} active learning alerts.`;
+
+      recommendedMove =
+        "Check recent mistakes and decide whether to reteach or simplify.";
+    } else if (totalSupportUses > 0) {
+      queuePriority = 5;
+
+      followUpReason =
+        supportInsight ||
+        "Student used supports during practice.";
+
+      recommendedMove =
+        "Monitor independence next time this student works on the skill.";
+    }
+
+    if (!queuePriority) return;
+
+    if (recentlyHandledStudents.includes(student)) return;
+
+    rows.push({
+      student,
+      queueType: "Follow-Up",
+      queuePriority,
+      queueColor: "#fff7ed",
+      queueBorder: "#fed7aa",
+      queueText: "#9a3412",
+      followUpReason,
+      recommendedMove,
+      targetOutcome,
+      supportInsight,
+      supportUsage,
+      assignment,
+      interventionCount: studentInterventions.length,
+      alertCount: studentAlerts.length,
+    });
+  });
+
+  return rows.sort(
+    (a, b) =>
+      a.queuePriority - b.queuePriority ||
+      a.student.localeCompare(b.student)
+  );
+}
 function getFriendlyReasoningLine(row, recommendedOutcome = null) {
   const focus = recommendedOutcome ? ` ${recommendedOutcome}` : "";
 
@@ -2464,6 +2789,9 @@ export default function TeacherDashboard({
   }
 });
 
+const currentStudentSupportUsage =
+  teacherAssignments?.[currentStudent]?.result?.supportUsage || null;
+
 const editableReportComment =
   currentStudent && editedReportComments[currentStudent] !== undefined
     ? editedReportComments[currentStudent]
@@ -2492,22 +2820,30 @@ useEffect(() => {
     return {
       ...prev,
       [currentStudent]: buildStudentReportSummary(
-        currentStudent,
-        indicatorStats,
-        assessmentStats,
-        teacherActionLog
-      ),
+  currentStudent,
+  indicatorStats,
+  assessmentStats,
+  teacherActionLog,
+  currentStudentSupportUsage
+)
     };
   });
-}, [currentStudent, indicatorStats, assessmentStats, teacherActionLog]);
+}, [
+  currentStudent,
+  indicatorStats,
+  assessmentStats,
+  teacherActionLog,
+  currentStudentSupportUsage,
+]);
  useEffect(() => {
   console.log(
     buildStudentReportSummary(
-      currentStudent,
-      indicatorStats,
-      assessmentStats,
-      teacherActionLog
-    )
+  currentStudent,
+  indicatorStats,
+  assessmentStats,
+  teacherActionLog,
+  currentStudentSupportUsage
+)
   );
 }, [currentStudent, indicatorStats, assessmentStats, teacherActionLog]);
 
@@ -2583,11 +2919,12 @@ function exportClassReportsPdf() {
   const reportCards = students
     .map((student) => {
       const comment = buildStudentReportSummary(
-        student,
-        classIndicatorStats,
-        classAssessmentStats,
-        teacherActionLog
-      );
+  student,
+  classIndicatorStats,
+  classAssessmentStats,
+  teacherActionLog,
+  classTeacherAssignments?.[student]?.result?.supportUsage || null
+);
 
       return `
                <section class="student-report">
@@ -2602,6 +2939,39 @@ function exportClassReportsPdf() {
                     <div class="comment-box">
             <div class="box-label">Report Comment Draft</div>
             <p>${escapeHtml(comment)}</p>
+            ${
+  classTeacherAssignments?.[student]?.result?.supportUsage
+    ? `
+      <div class="support-box">
+        <div class="box-label">Supports Used</div>
+
+        <div class="support-row">
+          🔊 Read Aloud:
+          ${
+            classTeacherAssignments[student]?.result?.supportUsage
+              ?.readAloudUsed || 0
+          }
+        </div>
+
+        <div class="support-row">
+          ✏️ Worked Examples:
+          ${
+            classTeacherAssignments[student]?.result?.supportUsage
+              ?.exampleOpened || 0
+          }
+        </div>
+
+        <div class="support-row">
+          📘 Strategy Reminders:
+          ${
+            classTeacherAssignments[student]?.result?.supportUsage
+              ?.reminderOpened || 0
+          }
+        </div>
+      </div>
+    `
+    : ""
+}
           </div>
 
                     <div class="checklist-box">
@@ -2682,6 +3052,19 @@ function exportClassReportsPdf() {
           }
 
                     .comment-box {
+                    .support-box {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 14px;
+  background: #ffffff;
+}
+
+.support-row {
+  font-size: 12px;
+  margin-top: 6px;
+  color: #334155;
+}
             border: 2px solid #cbd5e1;
             border-radius: 14px;
             padding: 16px;
@@ -2829,7 +3212,14 @@ const topTeacherMove =
   if (a.queuePriority !== b.queuePriority) return a.queuePriority - b.queuePriority;
   return a.student.localeCompare(b.student);
 });
-
+const interventionFollowUpQueue = getInterventionFollowUpQueue({
+  students,
+  teacherAssignments,
+  interventionLog,
+  assessmentStats,
+  alerts,
+  teacherActionLog,
+});
 const actedStudentNames = teacherActionLog
   .filter((entry) =>
     ["Assigned Practice", "Assigned Assessment", "Mini Lesson", "Completed Queue Student", "Needs Support"].includes(entry.type)
@@ -3383,24 +3773,143 @@ const weakestSkill =
         })[0]
     : null;
 
+     const completedRoleStats = selectedSummary?.assignment?.result?.roleStats || null;
 const smartBundle = buildSmartAssignmentBundle({
   weakestSkill,
   allIndicators: selectedIndicators,
+  roleStats: completedRoleStats,
 });
+const getRoleAccuracy = (row) =>
+  row?.attempts > 0 ? Math.round((row.correct / row.attempts) * 100) : null;
+
+const focusRoleAccuracy = getRoleAccuracy(completedRoleStats?.focus);
+const supportRoleAccuracy = getRoleAccuracy(completedRoleStats?.support);
+const reviewRoleAccuracy = getRoleAccuracy(completedRoleStats?.review);
+
+const adaptiveSmartBundleCount =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? 7
+    : focusRoleAccuracy !== null && focusRoleAccuracy < 80
+    ? 6
+    : supportRoleAccuracy !== null && supportRoleAccuracy < 80
+    ? 6
+    : reviewRoleAccuracy !== null && reviewRoleAccuracy < 80
+    ? 5
+    : focusRoleAccuracy !== null
+    ? 4
+    : 5;
+    const adaptiveSmartBundleLevel =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? "easy"
+    : focusRoleAccuracy !== null && focusRoleAccuracy >= 85 && supportRoleAccuracy !== null && supportRoleAccuracy >= 85
+    ? "challenge"
+    : "normal";
+    const adaptiveQuestionType =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? "visual"
+    : focusRoleAccuracy !== null && focusRoleAccuracy >= 85 && supportRoleAccuracy !== null && supportRoleAccuracy >= 85
+    ? "challenge"
+    : reviewRoleAccuracy !== null && reviewRoleAccuracy < 80
+    ? "mixedReview"
+    : "mixed";
+    const adaptiveRepresentation =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? "concreteVisual"
+    : focusRoleAccuracy !== null && focusRoleAccuracy < 80
+    ? "guidedVisual"
+    : reviewRoleAccuracy !== null && reviewRoleAccuracy < 80
+    ? "mixedReview"
+    : focusRoleAccuracy !== null && focusRoleAccuracy >= 85
+    ? "wordProblem"
+    : "standardVisual";
+    const adaptiveSmartBundleReason =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? "Focus accuracy is below 60%, so this bundle uses more questions with easier visual practice."
+    : focusRoleAccuracy !== null && focusRoleAccuracy < 80
+    ? "Focus accuracy is below 80%, so this bundle gives extra practice on the main skill."
+    : supportRoleAccuracy !== null && supportRoleAccuracy < 80
+    ? "Support accuracy is below 80%, so this bundle adds practice to strengthen the foundation."
+    : reviewRoleAccuracy !== null && reviewRoleAccuracy < 80
+    ? "Review accuracy is below 80%, so this bundle keeps mixed review active."
+    : focusRoleAccuracy !== null
+    ? "Recent role evidence looks secure, so this bundle is shorter and may add challenge."
+    : "No role evidence yet, so this bundle starts with the standard practice length.";
+
+const supportItems = smartBundle.filter((item) => item.type === "support");
+const reviewItems = smartBundle.filter((item) => item.type === "review");
+
+const adaptiveSupportReviewMix =
+  focusRoleAccuracy !== null && focusRoleAccuracy < 60
+    ? [...supportItems, ...supportItems.slice(0, 1)] // heavily support-weighted
+    : supportRoleAccuracy !== null && supportRoleAccuracy < 80
+    ? [...supportItems, ...reviewItems.slice(0, 1)] // mostly support, some review
+    : reviewRoleAccuracy !== null && reviewRoleAccuracy < 80
+    ? [...reviewItems, ...supportItems.slice(0, 1)] // mostly review, some support
+    : [...supportItems, ...reviewItems]; // balanced
+
 const smartBundleQuestions =
   currentStudent && weakestSkill
     ? buildPracticeQuestionSet(
-        "NO4",
-        activeAllQuestions,
-        "fractions",
-        5,
-        "normal",
-        weakestSkill.indicator,
-        smartBundle
-          .filter((item) => item.type === "support" || item.type === "review")
-          .map((item) => item.indicator)
+  "NO4",
+  activeAllQuestions,
+  "fractions",
+  adaptiveSmartBundleCount,
+  adaptiveSmartBundleLevel,
+  weakestSkill.indicator,
+adaptiveSupportReviewMix.length > 0
+  ? adaptiveSupportReviewMix
+  : smartBundle.filter((item) => item.type !== "focus"),
+adaptiveQuestionType,
+adaptiveRepresentation
       )
     : [];
+   
+const roleBasedNextStep = completedRoleStats
+  ? (() => {
+      const focus = completedRoleStats.focus;
+      const support = completedRoleStats.support;
+      const review = completedRoleStats.review;
+
+      const getAccuracy = (row) =>
+        row?.attempts > 0 ? Math.round((row.correct / row.attempts) * 100) : null;
+
+      const focusAccuracy = getAccuracy(focus);
+      const supportAccuracy = getAccuracy(support);
+      const reviewAccuracy = getAccuracy(review);
+
+      if (focusAccuracy !== null && focusAccuracy < 80) {
+        return "Continue with the focus skill using visual models and guided practice before moving on.";
+      }
+
+      if (supportAccuracy !== null && supportAccuracy < 80) {
+        return "Review the supporting skill to strengthen the foundation before extending the concept.";
+      }
+
+      if (reviewAccuracy !== null && reviewAccuracy < 80) {
+        return "Use short mixed review to maintain earlier learning while continuing the current skill.";
+      }
+
+      return "Move to a slightly more challenging version of this skill with explanation and real-world problems.";
+    })()
+  : null;
+const roleReportEvidenceSentence = completedRoleStats
+  ? (() => {
+      const formatRole = (label, row) => {
+        if (!row?.attempts) return null;
+        return `${label}: ${row.correct}/${row.attempts}`;
+      };
+
+      const parts = [
+        formatRole("focus", completedRoleStats.focus),
+        formatRole("support", completedRoleStats.support),
+        formatRole("review", completedRoleStats.review),
+      ].filter(Boolean);
+
+      return parts.length > 0
+        ? `Recent practice evidence shows ${parts.join(", ")}.`
+        : "";
+    })()
+  : "";
   const [referralEmail, setReferralEmail] = useState("resource.teacher@example.com");
   const [referralThreshold, setReferralThreshold] = useState(60);
   const [interventionType, setInterventionType] = useState("Small Group");
@@ -3797,6 +4306,7 @@ const [completedFocusedStudents, setCompletedFocusedStudents] = useState([]);
 const [miniLessonStudents, setMiniLessonStudents] = useState([]);
 const [autoAssignOnNext, setAutoAssignOnNext] = useState(false);
 const [liveActionMessage, setLiveActionMessage] = useState("");
+const [showOnlyAdaptedStudents, setShowOnlyAdaptedStudents] = useState(false);
   const [activeTeacherSection, setActiveTeacherSection] = useState("teacher-section-home");
 
   function recordLiveAction(message) {
@@ -4168,6 +4678,32 @@ function StatusPill({ status }) {
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 800 }}>
               Evidence: {selectedSummary?.supportCount || 0} support flag(s) · {selectedSummary?.alerts || 0} alert(s)
             </div>
+            {selectedSummary?.assignment?.result?.roleStats && (
+  <div
+    style={{
+      marginTop: 10,
+      padding: 10,
+      borderRadius: 12,
+      background: "#f1f5f9",
+      border: "1px solid #e2e8f0",
+      fontSize: 12,
+      fontWeight: 800,
+      color: "#334155",
+    }}
+  >
+    <div style={{ marginBottom: 4, color: "#475569" }}>
+      Practice Breakdown
+    </div>
+
+    {Object.entries(selectedSummary.assignment.result.roleStats).map(
+      ([key, stats]) => (
+        <div key={key}>
+          {key.toUpperCase()}: {stats.correct}/{stats.attempts}
+        </div>
+      )
+    )}
+  </div>
+)}
 
             {liveActionMessage && (
               <div
@@ -5270,6 +5806,7 @@ boxShadow: row.student === currentStudent ? "0 0 0 3px rgba(220, 38, 38, 0.16)" 
   workflowAssessmentRows={workflowAssessmentRows}
   workflowPracticeRows={workflowPracticeRows}
   workflowFollowUpRows={workflowFollowUpRows}
+  interventionFollowUpQueue={interventionFollowUpQueue}
   interventionReferralData={interventionReferralData}
   workflowTopReferralGroups={workflowTopReferralGroups}
   setCurrentStudent={setCurrentStudent}
@@ -5565,27 +6102,295 @@ background: actionColor,
           )}
         </Card>
 
-        <Card id="teacher-section-adaptations" title="Adaptations Scaffold" className="screen-only">
+        <Card id="teacher-section-adaptations" title="Student Adaptations Grid" className="screen-only">
           <p style={styles.sectionIntro}>
-            Class {selectedClass} is selected. Use this grid to record supports that will eventually change the student question view. Read aloud, worked examples, formula/reference sheets, simplified numbers, and lower-grade work are scaffolded now.
+           Class {selectedClass} is selected. Use this grid to turn supports on or off for each student. Checked supports are saved to that student's adaptation profile and can be used in the student question view.
           </p>
-          <div style={styles.adaptationGrid}>
-            <div style={styles.adaptationHeader}>Student</div>
-            <div style={styles.adaptationHeader}>Grade Level</div>
+          <button
+  type="button"
+  onClick={() => {
+    const confirmed = window.confirm(
+      `Clear all adaptation checkboxes for Class ${selectedClass}?`
+    );
+
+    if (!confirmed) return;
+
+    setStudentAdaptations((prev) => {
+      const next = { ...(prev || {}) };
+
+      students.forEach((student) => {
+        const existing = next[student] || {};
+
+        const clearedOptions = {};
+        ADAPTATION_OPTIONS.forEach((option) => {
+          clearedOptions[option.key] = false;
+        });
+
+        next[student] = {
+          ...existing,
+          ...clearedOptions,
+        };
+      });
+
+      return next;
+    });
+  }}
+  style={{
+    marginBottom: 12,
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: "1px solid #fecaca",
+    background: "#fff1f2",
+    color: "#be123c",
+    fontWeight: 900,
+    cursor: "pointer",
+  }}
+>
+  Clear All Adaptations for Class
+</button>
+<div
+  style={{
+    marginBottom: 12,
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  }}
+>
+  {ADAPTATION_OPTIONS.map((option) => {
+    const count = students.filter(
+      (student) => studentAdaptations?.[student]?.[option.key]
+    ).length;
+
+    return (
+      <span
+        key={option.key}
+        style={{
+          padding: "6px 10px",
+          borderRadius: 999,
+          background: count > 0 ? "#dbeafe" : "#f1f5f9",
+          color: count > 0 ? "#1e40af" : "#64748b",
+          fontSize: 12,
+          fontWeight: 900,
+        }}
+      >
+        {option.label}: {count}
+      </span>
+    );
+  })}
+</div>
+<label
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+    fontSize: 13,
+    fontWeight: 900,
+    color: "#334155",
+  }}
+>
+  <input
+    type="checkbox"
+    checked={showOnlyAdaptedStudents}
+    onChange={(e) => setShowOnlyAdaptedStudents(e.target.checked)}
+    style={{
+      width: 18,
+      height: 18,
+      accentColor: "#2563eb",
+    }}
+  />
+  Show only students with adaptations
+</label>
+          <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: `minmax(160px, 1.5fr) minmax(120px, 1fr) repeat(${ADAPTATION_OPTIONS.length}, minmax(110px, 1fr))`,
+    gap: 8,
+    alignItems: "center",
+    overflow: "auto",
+maxHeight: 520,
+    padding: 10,
+    border: "1px solid #e2e8f0",
+    borderRadius: 14,
+    background: "#ffffff",
+  }}
+>
+            <div
+  style={{
+    position: "sticky",
+    top: 0,
+    left: 0,
+    zIndex: 3,
+    background: "#e2e8f0",
+    padding: 10,
+    borderRadius: 10,
+    fontWeight: 900,
+    fontSize: 13,
+    color: "#334155",
+    textAlign: "center",
+  }}
+>
+  Student
+</div>
+            <div style={{
+  background: "#e2e8f0",
+  padding: 10,
+  borderRadius: 10,
+  fontWeight: 900,
+  fontSize: 13,
+  color: "#334155",
+  textAlign: "center",
+}}>Grade Level</div>
             {ADAPTATION_OPTIONS.map((option) => (
-              <div key={option.key} style={styles.adaptationHeader}>{option.label}</div>
+              <div key={option.key} style={{
+  background: "#e2e8f0",
+  padding: 10,
+  borderRadius: 10,
+  fontWeight: 900,
+  fontSize: 13,
+  color: "#334155",
+  textAlign: "center",
+}}>{option.label}</div>
             ))}
 
-            {students.map((student) => {
+            {students
+  .filter((student) => {
+    if (!showOnlyAdaptedStudents) return true;
+
+    return ADAPTATION_OPTIONS.some(
+      (option) => studentAdaptations?.[student]?.[option.key]
+    );
+  })
+  .map((student, studentIndex) => {
               const row = studentAdaptations?.[student] || {};
               return (
                 <React.Fragment key={student}>
-                  <button type="button" onClick={() => setCurrentStudent(student)} style={styles.adaptationStudentCell}>
-                    <strong>{student}</strong>
-                    <span>{student === currentStudent ? "Selected" : `Class ${selectedClass}`}</span>
-                  </button>
+                 <div onClick={() => setCurrentStudent(student)} style={{
+  position: "sticky",
+  left: 0,
+  top: 0,
+  zIndex: 2,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  justifyContent: "center",
+  padding: 10,
+  borderRadius: 10,
+  border: student === currentStudent ? "2px solid #2563eb" : "1px solid #e2e8f0",
+  background:
+  student === currentStudent
+    ? "#dbeafe"
+    : studentIndex % 2 === 0
+    ? "#f8fafc"
+    : "#ffffff",
+  cursor: "pointer",
+  fontWeight: student === currentStudent ? 950 : 800,
+}}>
+   <strong>
+  {student} (
+  {
+    ADAPTATION_OPTIONS.filter(
+      (option) => row?.[option.key]
+    ).length
+  }
+  )
 
-                  <div style={styles.adaptationCell}>
+  {ADAPTATION_OPTIONS.filter(
+    (option) => row?.[option.key]
+  ).length >= 4 && (
+    <span
+      style={{
+        marginLeft: 6,
+        color: "#b91c1c",
+        fontSize: 11,
+        fontWeight: 900,
+      }}
+    >
+      HIGH SUPPORT
+    </span>
+  )}
+</strong>
+                    <span>{student === currentStudent ? "Selected" : `Class ${selectedClass}`}</span>
+                    <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+
+    const allEnabled = ADAPTATION_OPTIONS.every(
+      (option) => studentAdaptations?.[student]?.[option.key]
+    );
+
+    const updatedRow = {};
+
+    ADAPTATION_OPTIONS.forEach((option) => {
+      updatedRow[option.key] = !allEnabled;
+    });
+
+    setStudentAdaptations((prev) => ({
+      ...(prev || {}),
+      [student]: {
+        ...(prev?.[student] || {}),
+        ...updatedRow,
+      },
+    }));
+  }}
+  style={{
+    marginTop: 6,
+    fontSize: 10,
+    fontWeight: 800,
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    borderRadius: 8,
+    padding: "4px 6px",
+    cursor: "pointer",
+  }}
+>
+  Toggle All
+</button>
+                  
+<select
+  value=""
+  onChange={(e) => {
+    const sourceStudent = e.target.value;
+    if (!sourceStudent) return;
+
+    const sourceAdaptations = studentAdaptations?.[sourceStudent] || {};
+
+    setStudentAdaptations((prev) => ({
+      ...(prev || {}),
+      [student]: {
+        ...(prev?.[student] || {}),
+        ...sourceAdaptations,
+      },
+    }));
+  }}
+  style={{
+    marginTop: 6,
+    width: "100%",
+    fontSize: 10,
+    borderRadius: 8,
+    border: "1px solid #cbd5e1",
+    padding: 4,
+  }}
+>
+  <option value="">Copy From...</option>
+  {students
+    .filter((s) => s !== student)
+    .map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+</select>
+</div>
+                  <div style={{
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 8,
+  minHeight: 44,
+  borderBottom: "1px solid #f1f5f9",
+}}>
                     <select
                       value={studentGradeLevels?.[student] || selectedGrade}
                       onChange={(e) => {
@@ -5605,10 +6410,23 @@ background: actionColor,
                   </div>
 
                   {ADAPTATION_OPTIONS.map((option) => (
-                    <label key={option.key} style={styles.adaptationCell}>
+                    <label key={option.key} style={{
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 8,
+  minHeight: 44,
+  borderBottom: "1px solid #f1f5f9",
+}}>
                       <input
                         type="checkbox"
                         checked={Boolean(row[option.key])}
+                        style={{
+  width: 20,
+  height: 20,
+  cursor: "pointer",
+  accentColor: "#2563eb",
+}}
                         onChange={(e) => {
                           setStudentAdaptations((prev) => ({
                             ...(prev || {}),
@@ -5626,7 +6444,7 @@ background: actionColor,
             })}
           </div>
           <div style={styles.recommendationBox}>
-            <strong>Safe scaffold note:</strong> Read aloud and support notices are active in student view now. Lower-grade content routing is scaffolded and ready for the next grade-level curriculum import.
+           <strong>Adaptation note:</strong> These settings are saved per student. Read aloud, examples, formula/reference sheets, and simplified numbers can be used by the student question view when adaptations are applied.
           </div>
         </Card>
 
@@ -6673,10 +7491,30 @@ background: actionColor,
                   <button type="button" onClick={() => onForceMiniLesson(row.student)} style={styles.gridActionButton}>Mini</button>
                   <button type="button" onClick={() => onSimplify(row.student)} style={styles.gridActionButton}>Simplify</button>
                   {teacherAssignments[row.student] && (
-                      <span style={getAssignmentPillStyle(teacherAssignments[row.student])}>
-                        {getAssignmentLabel(teacherAssignments[row.student])}
-                      </span>
-                    )}
+                        <>
+    <span style={getAssignmentPillStyle(teacherAssignments[row.student])}>
+      {getAssignmentLabel(teacherAssignments[row.student])}
+    </span>
+
+    {teacherAssignments[row.student]?.result?.supportInsight && (
+      <div
+        style={{
+          marginTop: 6,
+          padding: "6px 8px",
+          borderRadius: 10,
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          color: "#475569",
+          fontSize: 11,
+          fontWeight: 800,
+          lineHeight: 1.35,
+        }}
+      >
+        {teacherAssignments[row.student].result.supportInsight}
+      </div>
+    )}
+  </>
+)}
                 </div>
               </React.Fragment>
             ))}
@@ -7045,13 +7883,14 @@ background: actionColor,
   }}
 >
   {currentStudent
-    ? buildStudentReportSummary(
-        currentStudent,
-        indicatorStats,
-        assessmentStats,
-        teacherActionLog
-      )
-    : "Select a student to generate a report summary."}
+  ? `${buildStudentReportSummary(
+      currentStudent,
+      indicatorStats,
+      assessmentStats,
+      teacherActionLog,
+      currentStudentSupportUsage
+    )}${roleReportEvidenceSentence ? ` ${roleReportEvidenceSentence}` : ""}`
+  : "Select a student to generate a report summary."}
 </div>
 
 {/* Suggested Next Skill */}
@@ -7073,11 +7912,12 @@ background: actionColor,
   </div>
 
   {currentStudent && weakestSkill
-    ? getSuggestedNextSkill(
-        weakestSkill.indicator || "",
-        weakestSkill.status || "Developing"
-      )
-    : "Select a student with recorded indicator data to see next-step guidance."}
+  ? roleBasedNextStep ||
+    getSuggestedNextSkill(
+      weakestSkill.indicator || "",
+      weakestSkill.status || "Developing"
+    )
+  : "Select a student with recorded indicator data to see next-step guidance."}
 
   {currentStudent && weakestSkill ? (
     <div
@@ -7107,6 +7947,19 @@ background: actionColor,
   <div style={{ fontSize: 11, fontWeight: 900, color: "#475569" }}>
     Suggested Practice Bundle
   </div>
+  <div style={{ fontSize: 12, marginTop: 6, color: "#64748b", fontWeight: 700 }}>
+  {adaptiveSmartBundleCount} questions · {adaptiveSmartBundleLevel} level · {adaptiveQuestionType} type
+</div>
+
+<div style={{ fontSize: 12, marginTop: 4, color: "#475569" }}>
+  {adaptiveSmartBundleReason}
+</div>
+<div style={{ fontSize: 11, marginTop: 6, color: "#64748b", fontWeight: 800 }}>
+  Mix: {(adaptiveSupportReviewMix.length > 0
+  ? adaptiveSupportReviewMix
+  : smartBundle.filter((item) => item.type !== "focus")
+).map((item) => `${item.type}: ${item.indicator}`).join(" · ") || "focus only"}
+</div>
 
   {smartBundle?.length === 0 ? (
     <div style={{ fontSize: 12, marginTop: 6 }}>
@@ -7149,7 +8002,7 @@ background: actionColor,
             fontWeight: 700,
           }}
         >
-          {index + 1}. {question.practiceRole || "Practice"} — {question.prompt}
+         {index + 1}. {question.practiceRole || "Practice"} · {question.difficulty || adaptiveSmartBundleLevel} · {question.questionType || adaptiveQuestionType} · {question.representation || adaptiveRepresentation} — {question.prompt}
         </div>
       ))}
     </div>
@@ -7169,9 +8022,9 @@ background: actionColor,
   logTeacherAction({
     student: currentStudent,
     type: "Assigned Practice",
-    detail: `Assigned suggested fraction smart bundle (${smartBundleQuestions.length} questions): ${smartBundle
+    detail: `Assigned suggested fraction smart bundle (${smartBundleQuestions.length} questions, ${adaptiveSmartBundleLevel}, ${adaptiveQuestionType}, ${adaptiveRepresentation}): ${smartBundle
   .map((item) => `${item.type}: ${item.indicator}`)
-  .join(", ")}.`,
+  .join(", ")}. ${adaptiveSmartBundleReason}`,
   });
 
   console.log("Assigned suggested bundle preview:", smartBundleQuestions);
