@@ -9245,24 +9245,24 @@ onMouseLeave={(e) => {
   lessonQuestion={lessonQuestion}
   adaptationSupport={adaptationSupport}
   speakReadAloudText={speakReadAloudText}
-  setSupportUsage={setSupportUsage}
-  setInterventionLog={setInterventionLog}
+  setSupportUsage={() => {}}
+  setInterventionLog={() => {}}
   currentStudent={currentStudent}
 />
   
 <WorkedExampleSupport
   lessonQuestion={lessonQuestion}
   adaptationSupport={adaptationSupport}
-  setSupportUsage={setSupportUsage}
-  setInterventionLog={setInterventionLog}
+  setSupportUsage={() => {}}
+  setInterventionLog={() => {}}
   currentStudent={currentStudent}
 />
 
 <FormulaReminderSupport
   lessonQuestion={lessonQuestion}
   adaptationSupport={adaptationSupport}
-  setSupportUsage={setSupportUsage}
-  setInterventionLog={setInterventionLog}
+  setSupportUsage={() => {}}
+  setInterventionLog={() => {}}
   currentStudent={currentStudent}
 />
  
